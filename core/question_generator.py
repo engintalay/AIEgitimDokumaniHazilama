@@ -26,31 +26,34 @@ class QuestionGenerator:
     
     def _create_prompt(self, paragraph: str) -> str:
         """Create prompt for question generation."""
-        return f"""Aşağıdaki metinden {self.min_questions}-{self.max_questions} adet soru-cevap çifti oluştur.
+        return f"""Sen bir Türkçe eğitim dataset uzmanısın. Aşağıdaki metinden {self.min_questions}-{self.max_questions} adet soru-cevap çifti oluştur.
 
-KURALLAR:
-1. Her soru metinde açıkça geçen bilgilerden oluşturulmalı
-2. Cevaplar net, kısa ve doğru olmalı
-3. Halüsinasyon yapma, sadece metinde olan bilgileri kullan
-4. Sorular çeşitli olmalı (ne, nasıl, neden, kaç, hangi vb.)
-5. Her soru-cevap için confidence değeri belirle:
-   - "high": Metinde açıkça yazıyorsa, net kural varsa, menü yolu verilmişse
-   - "low": Metinde geçmiyorsa, belirsizse, dış kaynak gerektiriyorsa
+KRİTİK KURALLAR:
+1. SADECE metinde açıkça geçen bilgilerden soru oluştur
+2. Cevaplar net, kısa, doğru ve TAMAMEN TÜRKÇE olmalı
+3. HALÜSİNASYON YAPMA - metinde olmayan bilgi ekleme
+4. İngilizce kelime kullanma (available, usually, risk management vb. YASAK)
+5. Gramer hatası yapma, düzgün Türkçe cümleler kur
+6. Sorular çeşitli olmalı (ne, nasıl, neden, kaç, hangi, nerede vb.)
+
+CONFIDENCE KURALLARI:
+- "high": Metinde açıkça yazıyor, net kural var, menü yolu var
+- "low": Metinde geçmiyor, belirsiz, dış kaynak gerekiyor
 
 METIN:
 {paragraph}
 
-ÇIKTI FORMATI (JSON array):
+ÇIKTI FORMATI (sadece JSON array, başka hiçbir şey yazma):
 [
   {{
-    "instruction": "Soru metni",
+    "instruction": "Soru metni (düzgün Türkçe)",
     "input": "",
-    "output": "Cevap metni",
+    "output": "Cevap metni (düzgün Türkçe, kısa, net)",
     "confidence": "high"
   }}
 ]
 
-Sadece JSON array döndür, başka açıklama ekleme."""
+ÖNEMLİ: Sadece JSON array döndür. İngilizce kelime kullanma. Gramer hatası yapma."""
     
     def _parse_response(self, response: str) -> List[Dict[str, Any]]:
         """Parse AI response and extract questions."""

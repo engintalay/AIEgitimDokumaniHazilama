@@ -3,12 +3,12 @@
 # AI Model Ayarları
 model:
   type: "ollama"  # ollama, lmstudio, openai
-  name: "llama3.2"  # Model adı
+  name: "qwen2.5:14b"  # Türkçe için önerilen: qwen2.5:14b, llama3.1:8b
   endpoint: "http://localhost:11434"  # API endpoint
   api_key: ""  # Opsiyonel (OpenAI vb. için)
   
   # Model parametreleri
-  temperature: 0.7
+  temperature: 0.3  # Düşük = daha tutarlı, yüksek = daha yaratıcı
   max_tokens: 2000
   timeout: 120  # saniye
   retry_attempts: 3
