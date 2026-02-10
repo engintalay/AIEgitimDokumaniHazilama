@@ -16,7 +16,8 @@ class TextProcessor:
         cleaned = []
         for para in paragraphs:
             para = para.strip()
-            if len(para) >= min_length:
+            # Filter by length (min and max)
+            if min_length <= len(para) <= 2000:  # Max 2000 karakter
                 cleaned.append(para)
         
         return cleaned

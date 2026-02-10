@@ -9,10 +9,10 @@ model:
   
   # Model parametreleri
   temperature: 0.3  # Düşük = daha tutarlı, yüksek = daha yaratıcı
-  max_tokens: 2000
-  timeout: 120  # saniye
-  retry_attempts: 3
-  retry_delay: 5  # saniye
+  max_tokens: 800  # Azaltıldı - daha hızlı cevap
+  timeout: 300  # saniye (5 dakika)
+  retry_attempts: 2
+  retry_delay: 3  # saniye
   
   # Prompt formatı (model'e göre özelleştirilebilir)
   use_system_prompt: true  # System prompt kullan
@@ -24,10 +24,10 @@ model:
 
 # Soru üretimi ayarları
 generation:
-  min_questions_per_paragraph: 3
-  max_questions_per_paragraph: 8
+  min_questions_per_paragraph: 2  # Azaltıldı - daha hızlı
+  max_questions_per_paragraph: 5  # Azaltıldı - daha hızlı
   skip_short_paragraphs: true
-  min_paragraph_length: 50  # karakter
+  min_paragraph_length: 100  # karakter (çok kısa paragrafları atla)
 
 # Çıktı ayarları
 output:
