@@ -1,6 +1,7 @@
 """Question generator using AI models."""
 import json
 import re
+import logging
 from typing import List, Dict, Any
 from .ai_client import AIClient
 
@@ -43,7 +44,8 @@ CONFIDENCE KURALLARI:
 METIN:
 {paragraph}
 
-ÇIKTI FORMATI (sadece JSON array, başka hiçbir şey yazma):
+ÇOK ÖNEMLİ: Sadece ve sadece aşağıdaki JSON formatında cevap ver. Başka hiçbir açıklama, yorum veya metin ekleme!
+
 [
   {{
     "instruction": "Soru metni (düzgün Türkçe)",
@@ -51,19 +53,28 @@ METIN:
     "output": "Cevap metni (düzgün Türkçe, kısa, net)",
     "confidence": "high"
   }}
-]
-
-ÖNEMLİ: Sadece JSON array döndür. İngilizce kelime kullanma. Gramer hatası yapma."""
+]"""
     
     def _parse_response(self, response: str) -> List[Dict[str, Any]]:
         """Parse AI response and extract questions."""
+        # Clean response - remove markdown code blocks
+        response = response.strip()
+        response = re.sub(r'^```json\s*', '', response)
+        response = re.sub(r'^```\s*', '', response)
+        response = re.sub(r'\s*```$', '', response)
+        
         # Try to find JSON array in response
         json_match = re.search(r'\[.*\]', response, re.DOTALL)
         if not json_match:
+            # Log the response for debugging
+            logger = logging.getLogger(__name__)
+            logger.error(f"No JSON array found. Response was:\n{response[:500]}")
             raise ValueError("No valid JSON array found in response")
         
+        json_str = json_match.group(0)
+        
         try:
-            questions = json.loads(json_match.group(0))
+            questions = json.loads(json_str)
             
             # Validate and clean
             validated = []
@@ -76,6 +87,11 @@ METIN:
                         q['confidence'] = 'low'
                     validated.append(q)
             
+            if not validated:
+                raise ValueError("No valid questions found in response")
+            
             return validated
         except json.JSONDecodeError as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"JSON parse error. String was:\n{json_str[:500]}")
             raise ValueError(f"Failed to parse JSON: {str(e)}")
