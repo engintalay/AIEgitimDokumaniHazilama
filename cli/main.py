@@ -73,6 +73,11 @@ def main():
     
     # Setup logger
     log_level = 'DEBUG' if args.verbose else config['logging']['level']
+    
+    # AI request logging için özel ayar
+    if config['logging'].get('show_ai_requests', False) or args.verbose:
+        log_level = 'DEBUG'
+    
     logger = setup_logger(
         level=log_level,
         log_file=config['logging']['file'],

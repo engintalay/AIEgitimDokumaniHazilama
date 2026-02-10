@@ -1,7 +1,10 @@
 """LM Studio AI client implementation."""
 import requests
+import logging
 from typing import Dict, Any
 from .ai_client import AIClient
+
+logger = logging.getLogger(__name__)
 
 
 class LMStudioClient(AIClient):
@@ -20,6 +23,13 @@ class LMStudioClient(AIClient):
             "max_tokens": self.max_tokens
         }
         
+        # Log request
+        logger.debug(f"=== LM STUDIO REQUEST ===")
+        logger.debug(f"URL: {url}")
+        logger.debug(f"Model: {self.model_name}")
+        logger.debug(f"Temperature: {self.temperature}")
+        logger.debug(f"Prompt:\n{prompt[:500]}..." if len(prompt) > 500 else f"Prompt:\n{prompt}")
+        
         try:
             response = requests.post(
                 url,
@@ -27,8 +37,16 @@ class LMStudioClient(AIClient):
                 timeout=self.timeout
             )
             response.raise_for_status()
-            return response.json()['choices'][0]['message']['content']
+            result = response.json()['choices'][0]['message']['content']
+            
+            # Log response
+            logger.debug(f"=== LM STUDIO RESPONSE ===")
+            logger.debug(f"Response:\n{result[:500]}..." if len(result) > 500 else f"Response:\n{result}")
+            logger.debug(f"=========================\n")
+            
+            return result
         except Exception as e:
+            logger.error(f"LM Studio generation failed: {str(e)}")
             raise RuntimeError(f"LM Studio generation failed: {str(e)}")
     
     def is_available(self) -> bool:

@@ -3,7 +3,7 @@
 # AI Model Ayarları
 model:
   type: "ollama"  # ollama, lmstudio, openai
-  name: "qwen2.5:14b"  # Türkçe için önerilen: qwen2.5:14b, llama3.1:8b
+  name: "RefinedNeuro/Turkcell-LLM-7b-v1:latest"  # Türkçe için önerilen: qwen2.5:14b, llama3.1:8b
   endpoint: "http://localhost:11434"  # API endpoint
   api_key: ""  # Opsiyonel (OpenAI vb. için)
   
@@ -42,6 +42,7 @@ progress:
 
 # Loglama
 logging:
-  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  level: "INFO"  # DEBUG (detaylı), INFO, WARNING, ERROR
   file: "./data/logs/app.log"
   console: true
+  show_ai_requests: false  # true yapınca Ollama istek/cevapları gösterilir

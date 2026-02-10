@@ -1,8 +1,11 @@
 """Ollama AI client implementation."""
 import requests
 import json
+import logging
 from typing import Dict, Any
 from .ai_client import AIClient
+
+logger = logging.getLogger(__name__)
 
 
 class OllamaClient(AIClient):
@@ -22,6 +25,13 @@ class OllamaClient(AIClient):
             }
         }
         
+        # Log request
+        logger.debug(f"=== OLLAMA REQUEST ===")
+        logger.debug(f"URL: {url}")
+        logger.debug(f"Model: {self.model_name}")
+        logger.debug(f"Temperature: {self.temperature}")
+        logger.debug(f"Prompt:\n{prompt[:500]}..." if len(prompt) > 500 else f"Prompt:\n{prompt}")
+        
         try:
             response = requests.post(
                 url,
@@ -29,8 +39,16 @@ class OllamaClient(AIClient):
                 timeout=self.timeout
             )
             response.raise_for_status()
-            return response.json().get('response', '')
+            result = response.json().get('response', '')
+            
+            # Log response
+            logger.debug(f"=== OLLAMA RESPONSE ===")
+            logger.debug(f"Response:\n{result[:500]}..." if len(result) > 500 else f"Response:\n{result}")
+            logger.debug(f"======================\n")
+            
+            return result
         except Exception as e:
+            logger.error(f"Ollama generation failed: {str(e)}")
             raise RuntimeError(f"Ollama generation failed: {str(e)}")
     
     def is_available(self) -> bool:
