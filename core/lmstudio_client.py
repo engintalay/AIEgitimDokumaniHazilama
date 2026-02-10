@@ -14,13 +14,18 @@ class LMStudioClient(AIClient):
         """Generate response from LM Studio."""
         url = f"{self.endpoint}/v1/chat/completions"
         
+        # Qwen2.5 için system prompt
+        system_prompt = "Sen bir Türkçe eğitim dataset uzmanısın. Verilen talimatlara göre JSON formatında soru-cevap çiftleri oluşturursun."
+        
         payload = {
             "model": self.model_name,
             "messages": [
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
             "temperature": self.temperature,
-            "max_tokens": self.max_tokens
+            "max_tokens": self.max_tokens,
+            "response_format": {"type": "json_object"}  # JSON mode
         }
         
         # Log request
@@ -28,6 +33,7 @@ class LMStudioClient(AIClient):
         logger.debug(f"URL: {url}")
         logger.debug(f"Model: {self.model_name}")
         logger.debug(f"Temperature: {self.temperature}")
+        logger.debug(f"System: {system_prompt}")
         logger.debug(f"Prompt:\n{prompt[:500]}..." if len(prompt) > 500 else f"Prompt:\n{prompt}")
         
         try:
