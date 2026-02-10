@@ -23,6 +23,30 @@ class QuestionGenerator:
             questions = self._parse_response(response)
             return questions
         except Exception as e:
+            # Log detailed error information
+            logger = logging.getLogger(__name__)
+            logger.error(f"\n{'='*80}")
+            logger.error(f"QUESTION GENERATION ERROR")
+            logger.error(f"{'='*80}")
+            logger.error(f"Error: {str(e)}")
+            logger.error(f"\nPARAGRAPH ({len(paragraph)} chars):")
+            logger.error(f"{paragraph}")
+            logger.error(f"\nMODEL CONFIG:")
+            logger.error(f"  Type: {self.ai_client.config.get('type')}")
+            logger.error(f"  Name: {self.ai_client.model_name}")
+            logger.error(f"  Endpoint: {self.ai_client.endpoint}")
+            logger.error(f"  Temperature: {self.ai_client.temperature}")
+            logger.error(f"  Max Tokens: {self.ai_client.max_tokens}")
+            logger.error(f"  Timeout: {self.ai_client.timeout}")
+            logger.error(f"  Use System Prompt: {self.ai_client.use_system_prompt}")
+            logger.error(f"  JSON Mode: {self.ai_client.json_mode}")
+            logger.error(f"  JSON Wrapper: {self.ai_client.json_wrapper}")
+            logger.error(f"\nQUESTION SETTINGS:")
+            logger.error(f"  Min Questions: {self.min_questions}")
+            logger.error(f"  Max Questions: {self.max_questions}")
+            logger.error(f"\nPROMPT SENT:")
+            logger.error(f"{prompt}")
+            logger.error(f"{'='*80}\n")
             raise RuntimeError(f"Question generation failed: {str(e)}")
     
     def _create_prompt(self, paragraph: str) -> str:
@@ -75,6 +99,8 @@ Sadece JSON formatında cevap ver:
     
     def _parse_response(self, response: str) -> List[Dict[str, Any]]:
         """Parse AI response and extract questions."""
+        logger = logging.getLogger(__name__)
+        
         # Clean response - remove markdown code blocks
         response = response.strip()
         response = re.sub(r'^```json\s*', '', response)
@@ -93,23 +119,27 @@ Sadece JSON formatında cevap ver:
             elif isinstance(data, list):
                 questions = data
             else:
+                logger.error(f"Invalid JSON structure. Expected array or object with '{json_wrapper}' key")
+                logger.error(f"Received: {json.dumps(data, indent=2, ensure_ascii=False)[:500]}")
                 raise ValueError("Invalid JSON structure")
                 
         except json.JSONDecodeError:
             # Fallback: Try to find JSON array in response
             json_match = re.search(r'\[.*\]', response, re.DOTALL)
             if not json_match:
-                # Log the response for debugging
-                logger = logging.getLogger(__name__)
-                logger.error(f"No JSON found. Response was:\n{response[:500]}")
+                # Log the full response for debugging
+                logger.error(f"No JSON found in response.")
+                logger.error(f"FULL RESPONSE ({len(response)} chars):")
+                logger.error(f"{response}")
                 raise ValueError("No valid JSON found in response")
             
             json_str = json_match.group(0)
             try:
                 questions = json.loads(json_str)
             except json.JSONDecodeError as e:
-                logger = logging.getLogger(__name__)
-                logger.error(f"JSON parse error. String was:\n{json_str[:500]}")
+                logger.error(f"JSON parse error: {str(e)}")
+                logger.error(f"Attempted to parse:")
+                logger.error(f"{json_str[:1000]}")
                 raise ValueError(f"Failed to parse JSON: {str(e)}")
         
         # Validate and clean
@@ -124,6 +154,8 @@ Sadece JSON formatında cevap ver:
                 validated.append(q)
         
         if not validated:
+            logger.error(f"No valid questions found after validation")
+            logger.error(f"Raw questions: {json.dumps(questions, indent=2, ensure_ascii=False)[:500]}")
             raise ValueError("No valid questions found in response")
         
         return validated
