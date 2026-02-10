@@ -3,7 +3,7 @@
 # AI Model Ayarları
 model:
   type: "lmstudio"  # ollama, lmstudio, openai
-  name: "qwen2.5-14b-instruct"  # LM Studio'daki model adı
+  name: "qwen2.5-14b_uncensored_instruct"  # LM Studio'daki model adı
   endpoint: "http://localhost:1234"  # LM Studio default port
   api_key: ""  # Opsiyonel (OpenAI vb. için)
   
@@ -19,7 +19,7 @@ model:
   system_prompt: "Sen bir Türkçe eğitim dataset uzmanısın. Verilen talimatlara göre JSON formatında soru-cevap çiftleri oluşturursun."
   
   # JSON çıktı formatı
-  json_mode: true  # JSON mode aktif (LM Studio/OpenAI için)
+  json_mode: false  # JSON mode aktif (LM Studio bazı versiyonlarda desteklemeyebilir)
   json_wrapper: "questions"  # JSON'da wrapper key (boş ise direkt array)
 
 # Soru üretimi ayarları

@@ -27,9 +27,12 @@ class LMStudioClient(AIClient):
             "max_tokens": self.max_tokens
         }
         
-        # Add JSON mode if enabled
+        # Add JSON mode if enabled (some LM Studio versions may not support this)
         if self.json_mode:
-            payload["response_format"] = {"type": "json_object"}
+            try:
+                payload["response_format"] = {"type": "json_object"}
+            except:
+                logger.warning("JSON mode requested but may not be supported by LM Studio")
         
         # Log request
         logger.debug(f"=== LM STUDIO REQUEST ===")
@@ -56,6 +59,16 @@ class LMStudioClient(AIClient):
             logger.debug(f"=========================\n")
             
             return result
+        except requests.exceptions.HTTPError as e:
+            # Log detailed error
+            error_detail = ""
+            try:
+                error_detail = response.json()
+            except:
+                error_detail = response.text
+            logger.error(f"LM Studio HTTP Error: {e}")
+            logger.error(f"Response: {error_detail}")
+            raise RuntimeError(f"LM Studio generation failed: {str(e)}")
         except Exception as e:
             logger.error(f"LM Studio generation failed: {str(e)}")
             raise RuntimeError(f"LM Studio generation failed: {str(e)}")
