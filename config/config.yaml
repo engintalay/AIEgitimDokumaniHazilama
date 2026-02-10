@@ -1,0 +1,47 @@
+# AI Eğitim Dokümanı Hazırlama - Konfigürasyon
+
+# AI Model Ayarları
+model:
+  type: "ollama"  # ollama, lmstudio, openai
+  name: "llama3.2"  # Model adı
+  endpoint: "http://localhost:11434"  # API endpoint
+  api_key: ""  # Opsiyonel (OpenAI vb. için)
+  
+  # Model parametreleri
+  temperature: 0.7
+  max_tokens: 2000
+  timeout: 120  # saniye
+  retry_attempts: 3
+  retry_delay: 5  # saniye
+
+# Soru üretimi ayarları
+generation:
+  min_questions_per_paragraph: 3
+  max_questions_per_paragraph: 8
+  skip_short_paragraphs: true
+  min_paragraph_length: 50  # karakter
+
+# Çıktı ayarları
+output:
+  directory: "./data/output"
+  filename: "dataset.jsonl"
+  append_mode: true  # Var olan dosyaya ekle
+  
+# Checkpoint ayarları
+checkpoint:
+  enabled: true
+  directory: "./data/checkpoints"
+  save_interval: 5  # Her 5 paragrafta bir kaydet
+
+# İlerleme gösterimi
+progress:
+  show_detailed: true
+  show_eta: true
+  show_speed: true
+  update_interval: 1  # saniye
+
+# Loglama
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "./data/logs/app.log"
+  console: true
