@@ -29,7 +29,7 @@ generation:
   min_questions_per_paragraph: 2  # Azaltıldı - daha hızlı
   max_questions_per_paragraph: 5  # Azaltıldı - daha hızlı
   skip_short_paragraphs: true
-  min_paragraph_length: 1  # karakter (çok kısa paragrafları atla)
+  min_paragraph_length: 10  # karakter (çok kısa paragrafları atla)
 
 # Çıktı ayarları
 output:
