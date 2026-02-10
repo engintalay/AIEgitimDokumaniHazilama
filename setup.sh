@@ -1,0 +1,32 @@
+#!/bin/bash
+# Kurulum scripti
+
+echo "🚀 AI Eğitim Dokümanı Hazırlama - Kurulum"
+echo "=========================================="
+echo ""
+
+# Virtual environment oluştur
+if [ ! -d "venv" ]; then
+    echo "📦 Virtual environment oluşturuluyor..."
+    python3 -m venv venv
+    echo "✓ Virtual environment oluşturuldu"
+else
+    echo "✓ Virtual environment zaten mevcut"
+fi
+
+# Virtual environment'ı aktifleştir
+echo ""
+echo "🔧 Paketler yükleniyor..."
+source venv/bin/activate
+
+# Paketleri yükle
+pip install --upgrade pip
+pip install -r requirements.txt
+
+echo ""
+echo "✅ Kurulum tamamlandı!"
+echo ""
+echo "Kullanım için:"
+echo "  source venv/bin/activate"
+echo "  python cli/main.py --input dokuman.pdf"
+echo ""

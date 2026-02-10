@@ -16,12 +16,49 @@ Ham bilgi kaynaklarından (PDF, DOC, TXT) yapay zeka modeli eğitimi için JSONL
 
 ## Kurulum
 
+### Otomatik Kurulum (Önerilen)
+
+**Linux/Mac:**
 ```bash
-# Gerekli paketleri yükle
+./setup.sh
+```
+
+**Windows:**
+```bash
+setup.bat
+```
+
+### Manuel Kurulum
+
+```bash
+# Virtual environment oluştur
+python3 -m venv venv
+
+# Aktifleştir (Linux/Mac)
+source venv/bin/activate
+
+# Aktifleştir (Windows)
+venv\Scripts\activate
+
+# Paketleri yükle
 pip install -r requirements.txt
 ```
 
 ## Kullanım
+
+### Hızlı Başlangıç
+
+```bash
+# Kurulum scriptini çalıştır (ilk kez)
+./setup.sh
+
+# Programı çalıştır
+./run.sh --input dokuman.pdf --output dataset.jsonl
+
+# Veya manuel
+source venv/bin/activate
+python cli/main.py --input dokuman.pdf
+```
 
 ### Temel Kullanım
 
