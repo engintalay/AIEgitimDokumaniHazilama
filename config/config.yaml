@@ -13,6 +13,14 @@ model:
   timeout: 120  # saniye
   retry_attempts: 3
   retry_delay: 5  # saniye
+  
+  # Prompt formatı (model'e göre özelleştirilebilir)
+  use_system_prompt: true  # System prompt kullan
+  system_prompt: "Sen bir Türkçe eğitim dataset uzmanısın. Verilen talimatlara göre JSON formatında soru-cevap çiftleri oluşturursun."
+  
+  # JSON çıktı formatı
+  json_mode: true  # JSON mode aktif (LM Studio/OpenAI için)
+  json_wrapper: "questions"  # JSON'da wrapper key (boş ise direkt array)
 
 # Soru üretimi ayarları
 generation:

@@ -14,26 +14,31 @@ class LMStudioClient(AIClient):
         """Generate response from LM Studio."""
         url = f"{self.endpoint}/v1/chat/completions"
         
-        # Qwen2.5 için system prompt
-        system_prompt = "Sen bir Türkçe eğitim dataset uzmanısın. Verilen talimatlara göre JSON formatında soru-cevap çiftleri oluşturursun."
+        # Build messages based on config
+        messages = []
+        if self.use_system_prompt and self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+        messages.append({"role": "user", "content": prompt})
         
         payload = {
             "model": self.model_name,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ],
+            "messages": messages,
             "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
-            "response_format": {"type": "json_object"}  # JSON mode
+            "max_tokens": self.max_tokens
         }
+        
+        # Add JSON mode if enabled
+        if self.json_mode:
+            payload["response_format"] = {"type": "json_object"}
         
         # Log request
         logger.debug(f"=== LM STUDIO REQUEST ===")
         logger.debug(f"URL: {url}")
         logger.debug(f"Model: {self.model_name}")
         logger.debug(f"Temperature: {self.temperature}")
-        logger.debug(f"System: {system_prompt}")
+        logger.debug(f"JSON Mode: {self.json_mode}")
+        if self.use_system_prompt:
+            logger.debug(f"System: {self.system_prompt}")
         logger.debug(f"Prompt:\n{prompt[:500]}..." if len(prompt) > 500 else f"Prompt:\n{prompt}")
         
         try:

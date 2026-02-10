@@ -13,6 +13,12 @@ class AIClient(ABC):
         self.temperature = config.get('temperature', 0.7)
         self.max_tokens = config.get('max_tokens', 2000)
         self.timeout = config.get('timeout', 120)
+        
+        # Prompt format settings
+        self.use_system_prompt = config.get('use_system_prompt', False)
+        self.system_prompt = config.get('system_prompt', '')
+        self.json_mode = config.get('json_mode', False)
+        self.json_wrapper = config.get('json_wrapper', '')
     
     @abstractmethod
     def generate(self, prompt: str) -> str:

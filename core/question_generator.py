@@ -27,6 +27,32 @@ class QuestionGenerator:
     
     def _create_prompt(self, paragraph: str) -> str:
         """Create prompt for question generation."""
+        # Determine output format based on config
+        json_wrapper = self.ai_client.json_wrapper
+        
+        if json_wrapper:
+            # Wrapped format: {"questions": [...]}
+            example_format = f'''{{
+  "{json_wrapper}": [
+    {{
+      "instruction": "Soru metni",
+      "input": "",
+      "output": "Cevap metni",
+      "confidence": "high"
+    }}
+  ]
+}}'''
+        else:
+            # Direct array format: [...]
+            example_format = '''[
+  {
+    "instruction": "Soru metni",
+    "input": "",
+    "output": "Cevap metni",
+    "confidence": "high"
+  }
+]'''
+        
         return f"""Aşağıdaki metinden {self.min_questions}-{self.max_questions} adet soru-cevap çifti oluştur.
 
 KRİTİK KURALLAR:
@@ -45,16 +71,7 @@ METIN:
 {paragraph}
 
 Sadece JSON formatında cevap ver:
-{{
-  "questions": [
-    {{
-      "instruction": "Soru metni",
-      "input": "",
-      "output": "Cevap metni",
-      "confidence": "high"
-    }}
-  ]
-}}"""
+{example_format}"""
     
     def _parse_response(self, response: str) -> List[Dict[str, Any]]:
         """Parse AI response and extract questions."""
@@ -68,9 +85,10 @@ Sadece JSON formatında cevap ver:
             # Try to parse as JSON object first (LM Studio JSON mode)
             data = json.loads(response)
             
-            # Check if it's wrapped in "questions" key
-            if isinstance(data, dict) and 'questions' in data:
-                questions = data['questions']
+            # Check if it's wrapped (e.g., {"questions": [...]})
+            json_wrapper = self.ai_client.json_wrapper
+            if isinstance(data, dict) and json_wrapper and json_wrapper in data:
+                questions = data[json_wrapper]
             # Or if it's directly an array
             elif isinstance(data, list):
                 questions = data
