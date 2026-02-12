@@ -11,6 +11,11 @@ logger = logging.getLogger(__name__)
 class OllamaClient(AIClient):
     """Ollama AI client."""
     
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.session = requests.Session()
+        self.session.trust_env = False  # Proxy ayarlarını yoksay
+    
     def generate(self, prompt: str) -> str:
         """Generate response from Ollama."""
         url = f"{self.endpoint}/api/generate"
@@ -33,7 +38,7 @@ class OllamaClient(AIClient):
         logger.debug(f"Prompt:\n{prompt[:500]}..." if len(prompt) > 500 else f"Prompt:\n{prompt}")
         
         try:
-            response = requests.post(
+            response = self.session.post(
                 url,
                 json=payload,
                 timeout=self.timeout
@@ -54,7 +59,7 @@ class OllamaClient(AIClient):
     def is_available(self) -> bool:
         """Check if Ollama is running."""
         try:
-            response = requests.get(f"{self.endpoint}/api/tags", timeout=5)
+            response = self.session.get(f"{self.endpoint}/api/tags", timeout=5)
             return response.status_code == 200
         except:
             return False
