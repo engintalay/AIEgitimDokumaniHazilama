@@ -145,13 +145,44 @@ Sadece JSON formatında cevap ver:
         # Validate and clean
         validated = []
         for q in questions:
-            if all(k in q for k in ['instruction', 'output', 'confidence']):
-                if 'input' not in q:
-                    q['input'] = ""
-                # Ensure confidence is only high or low
-                if q['confidence'] not in ['high', 'low']:
-                    q['confidence'] = 'low'
-                validated.append(q)
+            # Normalize Turkish field names to English
+            normalized = {}
+            
+            # Map Turkish to English field names
+            field_mapping = {
+                'instruction': 'instruction',
+                'soru': 'instruction',
+                'input': 'input',
+                'giriş': 'input',
+                'girdi': 'input',
+                'output': 'output',
+                'çıkış': 'output',
+                'cevap': 'output',
+                'confidence': 'confidence',
+                'güvenilirlik': 'confidence',
+                'güven': 'confidence'
+            }
+            
+            # Normalize fields
+            for key, value in q.items():
+                normalized_key = field_mapping.get(key.lower(), key)
+                normalized[normalized_key] = value
+            
+            # Check required fields
+            if all(k in normalized for k in ['instruction', 'output', 'confidence']):
+                if 'input' not in normalized:
+                    normalized['input'] = ""
+                
+                # Normalize confidence values
+                conf = str(normalized['confidence']).lower()
+                if conf in ['high', 'yüksek', 'yuksek']:
+                    normalized['confidence'] = 'high'
+                elif conf in ['low', 'düşük', 'dusuk', 'alçak']:
+                    normalized['confidence'] = 'low'
+                else:
+                    normalized['confidence'] = 'low'
+                
+                validated.append(normalized)
         
         if not validated:
             logger.error(f"No valid questions found after validation")

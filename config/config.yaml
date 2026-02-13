@@ -51,7 +51,7 @@ progress:
 
 # Loglama
 logging:
-  level: "INFO"  # DEBUG (detaylı), INFO, WARNING, ERROR
+  level: "DEBUG"  # DEBUG (detaylı), INFO, WARNING, ERROR
   file: "./data/logs/app.log"
   console: true
-  show_ai_requests: true  # true yapınca Ollama istek/cevapları gösterilir
+  show_ai_requests: true  # true yapınca AI istek/cevapları gösterilir
