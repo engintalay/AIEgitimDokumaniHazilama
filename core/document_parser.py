@@ -1,8 +1,7 @@
 """Document parser for PDF, DOCX, and TXT files."""
 import os
 from typing import Optional
-import PyPDF2
-import pdfplumber
+import fitz  # pymupdf
 from docx import Document
 
 
@@ -28,13 +27,18 @@ class DocumentParser:
     
     @staticmethod
     def _parse_pdf(file_path: str) -> str:
-        """Extract text from PDF using pdfplumber."""
+        """Extract text from PDF using pymupdf (more robust than pdfplumber)."""
         text = []
-        with pdfplumber.open(file_path) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
+        try:
+            doc = fitz.open(file_path)
+            for page in doc:
+                page_text = page.get_text()
+                if page_text and page_text.strip():
                     text.append(page_text)
+            doc.close()
+        except Exception as e:
+            raise RuntimeError(f"Failed to parse PDF: {str(e)}")
+        
         return "\n".join(text)
     
     @staticmethod

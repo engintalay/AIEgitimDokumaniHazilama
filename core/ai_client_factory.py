@@ -4,6 +4,7 @@ from core.ai_client import AIClient
 from core.ollama_client import OllamaClient
 from core.lmstudio_client import LMStudioClient
 from core.openai_client import OpenAIClient
+from core.llamacpp_client import LlamaCppClient
 
 
 class AIClientFactory:
@@ -20,5 +21,7 @@ class AIClientFactory:
             return LMStudioClient(config)
         elif model_type == 'openai':
             return OpenAIClient(config)
+        elif model_type == 'llamacpp':
+            return LlamaCppClient(config)
         else:
             raise ValueError(f"Unsupported model type: {model_type}")

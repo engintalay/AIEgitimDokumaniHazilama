@@ -5,7 +5,7 @@ Ham bilgi kaynaklarından (PDF, DOC, TXT) yapay zeka modeli eğitimi için JSONL
 ## Özellikler
 
 - ✅ PDF, DOCX, TXT formatlarını destekler
-- ✅ Ollama ve LM Studio ile çalışır
+- ✅ Ollama, LM Studio ve llama.cpp ile çalışır
 - ✅ OpenAI desteği için hazır altyapı
 - ✅ Paragraf bazında otomatik soru-cevap üretimi
 - ✅ Confidence değerlendirmesi (high/low)
@@ -94,7 +94,7 @@ python cli/main.py --input dokuman.pdf --verbose
 
 `config/config.yaml` dosyasını düzenleyerek ayarları özelleştirebilirsiniz:
 
-- Model tipi (ollama, lmstudio, openai)
+- Model tipi (ollama, lmstudio, llamacpp, openai)
 - Model parametreleri (temperature, max_tokens)
 - Soru üretim ayarları
 - Checkpoint ayarları
