@@ -91,10 +91,16 @@ CONFIDENCE KURALLARI:
 - "high": Metinde açıkça yazıyor, net kural var
 - "low": Metinde geçmiyor, belirsiz, dış kaynak gerekiyor
 
+JSON KURALLARI:
+- Geçerli JSON formatı kullan
+- String'lerde çift tırnak kullan
+- Özel karakterleri escape et (\\n, \\", \\\\)
+- Tırnak işaretlerini kapatmayı unutma
+
 METIN:
 {paragraph}
 
-Sadece JSON formatında cevap ver:
+SADECE geçerli JSON formatında cevap ver, başka açıklama ekleme:
 {example_format}"""
     
     def _parse_response(self, response: str) -> List[Dict[str, Any]]:
@@ -111,15 +117,27 @@ Sadece JSON formatında cevap ver:
             # Try to parse as JSON object first (LM Studio JSON mode)
             data = json.loads(response)
             
-            # Check if it's wrapped (e.g., {"questions": [...]})
+            # Check if it's wrapped (e.g., {"questions": [...]} or {"sorular": [...]})
             json_wrapper = self.ai_client.json_wrapper
-            if isinstance(data, dict) and json_wrapper and json_wrapper in data:
-                questions = data[json_wrapper]
+            wrapper_variants = [json_wrapper, 'sorular', 'questions', 'items']  # Turkish and English variants
+            
+            if isinstance(data, dict):
+                # Try to find questions in any wrapper variant
+                questions = None
+                for wrapper in wrapper_variants:
+                    if wrapper and wrapper in data:
+                        questions = data[wrapper]
+                        break
+                
+                if questions is None:
+                    logger.error(f"Invalid JSON structure. Expected array or object with wrapper key")
+                    logger.error(f"Received: {json.dumps(data, indent=2, ensure_ascii=False)[:500]}")
+                    raise ValueError("Invalid JSON structure")
             # Or if it's directly an array
             elif isinstance(data, list):
                 questions = data
             else:
-                logger.error(f"Invalid JSON structure. Expected array or object with '{json_wrapper}' key")
+                logger.error(f"Invalid JSON structure. Expected array or object")
                 logger.error(f"Received: {json.dumps(data, indent=2, ensure_ascii=False)[:500]}")
                 raise ValueError("Invalid JSON structure")
                 
