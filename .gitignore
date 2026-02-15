@@ -36,21 +36,40 @@ pyvenv.cfg
 .DS_Store
 
 # Data files
-data/output/*.jsonl
-data/checkpoints/*.json
-data/logs/*.log
+data/output/*
+data/checkpoints/*
+data/logs/*
+data/images/*
 
 # Keep directory structure
 !data/output/.gitkeep
 !data/checkpoints/.gitkeep
 !data/logs/.gitkeep
+!data/images/.gitkeep
 
 # Test files
 test_*.pdf
 test_*.docx
 test_*.txt
 sample_*.pdf
-
+*.txt
+*.pdf
+*.docx
+*.jsonl
+*.json
+*.log
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.docx
+*.txt
+*.jsonl
+*.json
+*.log
+*.png
+*.jpg
+*.jpeg
 # Config overrides (optional)
 config/local.yaml
 
@@ -60,3 +79,4 @@ config/local.yaml
 
 # OS
 Thumbs.db
+
