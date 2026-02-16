@@ -9,6 +9,7 @@ def main():
     parser = argparse.ArgumentParser(description='Split a document into paragraphs and save as .txt')
     parser.add_argument('input_file', help='Path to the input file (PDF, DOCX, TXT)')
     parser.add_argument('--min-length', type=int, default=50, help='Minimum character length for a paragraph (default: 50)')
+    parser.add_argument('--mode', choices=['paragraph', 'page'], default='paragraph', help='Segmentation mode: paragraph or page (default: paragraph)')
     
     args = parser.parse_args()
     
@@ -21,23 +22,25 @@ def main():
     base_name = os.path.splitext(input_path)[0]
     output_path = f"{base_name}.txt"
     
-    print(f"Processing: {input_path}")
+    print(f"Processing: {input_path} (Mode: {args.mode})")
     
     try:
         # Step 1: Parse the document
-        text = DocumentParser.parse(input_path)
+        text = DocumentParser.parse(input_path, args.mode)
         
-        # Step 2: Split into paragraphs
-        paragraphs = TextProcessor.split_into_paragraphs(text, args.min_length)
+        # Step 2: Split into paragraphs/pages
+        units = TextProcessor.split_into_paragraphs(text, args.min_length, args.mode)
         
-        print(f"Found {len(paragraphs)} paragraphs.")
+        unit_type = "pages" if args.mode == 'page' else "paragraphs"
+        print(f"Found {len(units)} {unit_type}.")
         
         # Step 3: Save to .txt
-        with open(output_path, 'w', encoding='utf-8') as f:
-            for i, para in enumerate(paragraphs, 1):
-                f.write(f"--- PARAGRAF {i} BAŞLANGIÇ ---\n")
-                f.write(para)
-                f.write(f"\n--- PARAGRAF {i} BİTİŞ ---\n\n")
+        with open(output_path, 'w', encoding='utf-8', errors='replace') as f:
+            for i, unit in enumerate(units, 1):
+                label = "SAYFA" if args.mode == 'page' else "PARAGRAF"
+                f.write(f"--- {label} {i} BAŞLANGIÇ ---\n")
+                f.write(unit)
+                f.write(f"\n--- {label} {i} BİTİŞ ---\n\n")
             
         print(f"Success! Output saved to: {output_path}")
         

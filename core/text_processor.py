@@ -7,8 +7,14 @@ class TextProcessor:
     """Process and split text into paragraphs."""
     
     @staticmethod
-    def split_into_paragraphs(text: str, min_length: int = 50) -> List[str]:
-        """Split text into paragraphs, filter, and merge logical units with list awareness."""
+    def split_into_paragraphs(text: str, min_length: int = 50, mode: str = 'paragraph') -> List[str]:
+        """Split text into paragraphs or pages, filter, and merge logical units."""
+        
+        if mode == 'page':
+            # Split by page marker
+            pages = re.split(r'---\s*SAYFA\s*\d+\s*---', text)
+            return [p.strip() for p in pages if p.strip()]
+
         # Initial split by double newlines or single newlines with spacing
         paragraphs = re.split(r'\n\s*\n', text)
         
@@ -98,23 +104,28 @@ class TextProcessor:
             
             # Rule 1: Header/Category merge (Balanced threshold: 150)
             is_header = len(current) < 150 and not re.search(r'[.!?]$', current.strip())
-            if is_header or current_ends_colon:
+            
+            # Rule 2: Citation/Reference Detection (Merge short trailing block with previous)
+            is_citation = len(next_unit) < 100 and not re.search(r'[.!?]$', next_unit.strip()) and \
+                          (',' in next_unit or re.search(r'^[A-ZÇÖÜİŞĞ]', next_unit))
+            
+            # Rule 3: Literary connectors
+            next_starts_connector = re.match(r'^(İmdi|\(\.\.\.\)|Ha,|Meğer|Oysa|Halbuki)', next_unit, re.I)
+
+            # Rule 4: Title Detection (Current is a short title leading into next)
+            current_is_title = len(current) < 100 and (current.isupper() or not re.search(r'[.!?]$', current.strip()))
+
+            if is_header or current_ends_colon or current_is_title:
                 if not (next_unit.startswith('|') or next_unit.startswith('[GÖRSEL:')):
                     should_merge = True
-            
-            # Rule 2: Sequential list items
+            elif is_citation or next_starts_connector:
+                should_merge = True
             elif current_is_list and next_is_list:
                 should_merge = True
-            
-            # Rule 3: Short continuations (e.g. following a header, but avoid section merging)
             elif is_header and len(next_unit) < 150 and not (next_unit.startswith('|') or next_unit.startswith('[GÖRSEL:')):
                  should_merge = True
-                
-            # Rule 4: Sequential tables
             elif (current.startswith('|') or '|--' in current) and next_unit.startswith('|'):
                 should_merge = True
-                
-            # Rule 5: Small indicator words for tables
             elif (re.match(r'^(Not|Önemli|Dikkat)$', current.strip(), re.I) or re.match(r'^\(\d+\)$', current.strip())) and next_unit.startswith('|'):
                 should_merge = True
 
@@ -154,7 +165,7 @@ class TextProcessor:
                 has_list = any(list_line_pattern.match(line.strip()) for line in block_lines)
                 
                 if has_list:
-                    # Smart list unwrapping: join continuation lines to list items
+                    # Smart list unwrapping
                     list_items = []
                     current_item = ""
                     for line in block_lines:
