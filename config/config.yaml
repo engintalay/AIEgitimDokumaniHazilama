@@ -2,22 +2,22 @@
 
 # AI Model Ayarları
 model:
-  type: "llamacpp"  # ollama, lmstudio, openai, llamacpp
-  name: ""  # llama.cpp için model adı gerekmez
-  endpoint: "http://127.0.0.1:8080"  # llama.cpp default port
+  type: "lmstudio"  # ollama, lmstudio, openai, llamacpp
+  name: "turkish-llama-8b-instruct-v0.1"  # LM Studio'daki tam ID
+  endpoint: "http://127.0.0.1:1234"  # LM Studio default port
   #endpoint: "http://127.0.0.1:11434"  # Ollama default port
   api_key: ""  # Opsiyonel (OpenAI vb. için)
   
   # Model parametreleri
   temperature: 0.3  # Düşük = daha tutarlı, yüksek = daha yaratıcı
-  max_tokens: 800  # Azaltıldı - daha hızlı cevap
+  max_tokens: 512  # Token limitini düşürdük
   timeout: 300  # saniye (5 dakika)
   retry_attempts: 2
   retry_delay: 3  # saniye
   
   # Prompt formatı (model'e göre özelleştirilebilir)
   use_system_prompt: true  # System prompt kullan
-  system_prompt: "Sen bir Türkçe eğitim dataset uzmanısın. Verilen talimatlara göre JSON formatında soru-cevap çiftleri oluşturursun."
+  system_prompt: "Sen bir Türkçe eğitim dataset uzmanısın. Verilen bağlam bilgilerine göre soruları yanıtla."
   
   # JSON çıktı formatı
   json_mode: false  # JSON mode aktif (LM Studio bazı versiyonlarda desteklemeyebilir)
@@ -55,3 +55,10 @@ logging:
   file: "./data/logs/app.log"
   console: true
   show_ai_requests: true  # true yapınca AI istek/cevapları gösterilir
+
+# RAG (Vector Search) Ayarları
+rag:
+  db_path: "./data/vector_db"
+  collection_name: "training_docs"
+  embedding_model: "text-embedding-nomic-embed-text-v1.5"  # LM Studio için tam ID
+  top_k: 2  # Bağlam sayısını 2'ye düşürdük

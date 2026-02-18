@@ -23,6 +23,10 @@ source venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 
+# Gerekli dizinleri oluştur
+echo "📂 Dizinler oluşturuluyor..."
+mkdir -p data/output data/checkpoints data/logs data/images data/vector_db data/uploads
+
 echo ""
 echo "✅ Kurulum tamamlandı!"
 echo ""

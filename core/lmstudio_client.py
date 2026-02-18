@@ -17,8 +17,11 @@ class LMStudioClient(AIClient):
         # Build messages based on config
         messages = []
         if self.use_system_prompt and self.system_prompt:
-            messages.append({"role": "system", "content": self.system_prompt})
-        messages.append({"role": "user", "content": prompt})
+            # Join system prompt with user prompt to avoid "system role not supported" errors in some model templates
+            full_prompt = f"{self.system_prompt}\n\n{prompt}"
+            messages.append({"role": "user", "content": full_prompt})
+        else:
+            messages.append({"role": "user", "content": prompt})
         
         payload = {
             "model": self.model_name,

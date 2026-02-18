@@ -21,6 +21,15 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 
 echo.
+echo Dizinler olusturuluyor...
+if not exist "data\output" mkdir data\output
+if not exist "data\checkpoints" mkdir data\checkpoints
+if not exist "data\logs" mkdir data\logs
+if not exist "data\images" mkdir data\images
+if not exist "data\vector_db" mkdir data\vector_db
+if not exist "data\uploads" mkdir data\uploads
+
+echo.
 echo Kurulum tamamlandi!
 echo.
 echo Kullanim icin:

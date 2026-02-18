@@ -40,14 +40,18 @@ data/output/*
 data/checkpoints/*
 data/logs/*
 data/images/*
+data/vector_db/*
+data/uploads/*
 
 # Keep directory structure
 !data/output/.gitkeep
 !data/checkpoints/.gitkeep
 !data/logs/.gitkeep
 !data/images/.gitkeep
+!data/vector_db/.gitkeep
+!data/uploads/.gitkeep
 
-# Test files
+# Test and Data files
 test_*.pdf
 test_*.docx
 test_*.txt
@@ -55,15 +59,6 @@ sample_*.pdf
 *.txt
 *.pdf
 *.docx
-*.jsonl
-*.json
-*.log
-*.png
-*.jpg
-*.jpeg
-*.pdf
-*.docx
-*.txt
 *.jsonl
 *.json
 *.log
