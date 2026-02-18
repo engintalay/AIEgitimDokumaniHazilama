@@ -22,14 +22,37 @@ class VectorDB:
             ids=ids
         )
 
-    def query(self, query_embedding: List[float], n_results: int = 3) -> Dict[str, Any]:
-        """Search for most similar documents."""
+    def query(self, query_embedding: List[float], n_results: int = 3, source: Optional[str] = None) -> Dict[str, Any]:
+        """Search for most similar documents with optional source filtering."""
+        where = {"source": source} if source else None
+        
         results = self.collection.query(
             query_embeddings=[query_embedding],
-            n_results=n_results
+            n_results=n_results,
+            where=where
         )
         return results
 
     def get_collection_count(self) -> int:
         """Return total document count in collection."""
         return self.collection.count()
+
+    def get_unique_sources(self) -> List[str]:
+        """Return list of unique source filenames in the DB."""
+        data = self.collection.get(include=['metadatas'])
+        sources = set()
+        if data and data['metadatas']:
+            for m in data['metadatas']:
+                if m and 'source' in m:
+                    sources.add(m['source'])
+        return sorted(list(sources))
+
+    def delete_by_source(self, source: str):
+        """Delete all documents associated with a specific source."""
+        self.collection.delete(where={"source": source})
+
+    def reset(self):
+        """Clear all documents in the collection."""
+        name = self.collection.name
+        self.client.delete_collection(name)
+        self.collection = self.client.create_collection(name=name)

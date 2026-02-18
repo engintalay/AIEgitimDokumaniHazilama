@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
 </head>
+
 <body>
     <div class="app-container">
         <header>
@@ -31,9 +33,32 @@
                     </div>
                     <div id="file-list" class="file-list"></div>
                 </div>
+
+                <div class="stats-section">
+                    <div class="stats-header">
+                        <h3>Veri Tabanı</h3>
+                        <button id="reset-db-btn" class="text-btn danger" title="Tümünü Sıfırla">Sıfırla</button>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-value" id="db-count">-</span>
+                            <span class="stat-label">Paragraf</span>
+                        </div>
+                    </div>
+                    <div class="sources-list" id="db-sources">
+                        <!-- Kaynaklar JS ile buraya eklenecek -->
+                    </div>
+                </div>
             </section>
 
             <section class="chat-section">
+                <div class="progress-container" id="global-progress-container" style="display:none;">
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="global-progress-bar"></div>
+                    </div>
+                    <span class="progress-text" id="global-progress-text">0%</span>
+                </div>
+
                 <div class="chat-window" id="chat-window">
                     <div class="message bot-message">
                         <div class="message-content">
@@ -41,7 +66,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="input-area">
                     <div class="input-container">
                         <textarea id="user-input" placeholder="Sorunuzu buraya yazın..." rows="1"></textarea>
@@ -58,4 +83,5 @@
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
+
 </html>
