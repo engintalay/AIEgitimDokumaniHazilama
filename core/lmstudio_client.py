@@ -83,3 +83,14 @@ class LMStudioClient(AIClient):
             return response.status_code == 200
         except:
             return False
+
+    def get_available_models(self) -> list:
+        """Fetch models from LM Studio /v1/models."""
+        try:
+            response = requests.get(f"{self.endpoint}/v1/models", timeout=5)
+            response.raise_for_status()
+            models = response.json().get('data', [])
+            return [m['id'] for m in models]
+        except Exception as e:
+            logger.error(f"LM Studio model fetch failed: {e}")
+            return []

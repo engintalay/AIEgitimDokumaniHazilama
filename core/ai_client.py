@@ -29,3 +29,8 @@ class AIClient(ABC):
     def is_available(self) -> bool:
         """Check if the AI service is available."""
         pass
+
+    @abstractmethod
+    def get_available_models(self) -> list:
+        """Fetch list of available models from the provider."""
+        pass

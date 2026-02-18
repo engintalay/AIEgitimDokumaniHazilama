@@ -14,13 +14,32 @@
         <header>
             <div class="logo">
                 <span class="logo-icon">✨</span>
-                <h1>Doküman Asistanı</h1>
+                <h1>Asistan</h1>
             </div>
-            <div class="status-badge" id="app-status">Sistem Hazır</div>
+            <div class="user-badge">
+                <img src="{{ current_user.picture }}" alt="User" class="avatar">
+                <span class="user-name">{{ current_user.name }}</span>
+                <a href="{{ url_for('logout') }}" class="icon-btn" title="Çıkış Yap">🚪</a>
+            </div>
+            <div class="header-actions">
+                <div class="status-badge" id="app-status">Sistem Hazır</div>
+                <button id="settings-btn" class="icon-btn" title="Ayarlar">⚙️</button>
+            </div>
         </header>
 
         <main>
             <section class="sidebar">
+                <div class="sidebar-top">
+                    <button id="new-chat-btn" class="primary-btn w-full">+ Yeni Sohbet</button>
+                </div>
+
+                <div class="history-section">
+                    <h3>Sohbet Geçmişi</h3>
+                    <div id="chat-history-list" class="history-list">
+                        <!-- Sohbetler buraya gelecek -->
+                    </div>
+                </div>
+
                 <div class="upload-section">
                     <h3>Dosya Yükle</h3>
                     <div class="upload-zone" id="drop-zone">
@@ -79,6 +98,64 @@
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Ayarlar</h2>
+                <button id="close-settings" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="settings-form">
+                    <div class="settings-group">
+                        <label>AI Sağlayıcı</label>
+                        <select name="type" id="config-model-type">
+                            <option value="ollama">Ollama</option>
+                            <option value="lmstudio">LM Studio</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="llamacpp">llama.cpp</option>
+                        </select>
+                    </div>
+                    <div class="settings-group">
+                        <label>AI Model</label>
+                        <select name="name" id="config-model-name">
+                            <option value="">Yükleniyor...</option>
+                        </select>
+                    </div>
+                    <div class="settings-group">
+                        <label>API Endpoint</label>
+                        <input type="text" name="endpoint" id="config-endpoint">
+                    </div>
+                    <div class="settings-row">
+                        <div class="settings-group">
+                            <label>Sıcaklık (Temp)</label>
+                            <input type="number" step="0.1" name="temperature" id="config-temp">
+                        </div>
+                        <div class="settings-group">
+                            <label>Max Tokens</label>
+                            <input type="number" name="max_tokens" id="config-max-tokens">
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <label>Log Seviyesi</label>
+                        <select name="log_level" id="config-log-level">
+                            <option value="DEBUG">DEBUG (Detaylı)</option>
+                            <option value="INFO">INFO (Normal)</option>
+                            <option value="WARNING">WARNING</option>
+                            <option value="ERROR">ERROR</option>
+                        </select>
+                    </div>
+                    <div class="settings-warning">
+                        ⚠️ Değişiklikler kaydedildiğinde sistem bileşenleri yeniden başlatılacaktır.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button id="save-settings" class="primary-btn">Kaydet</button>
+            </div>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>

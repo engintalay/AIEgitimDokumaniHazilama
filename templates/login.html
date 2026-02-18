@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giriş Yap - AI Doküman Asistanı</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        .login-container {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-dark);
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+        }
+
+        .login-card {
+            background: var(--bg-card);
+            padding: 3rem;
+            border-radius: 1.5rem;
+            border: 1px solid var(--border-color);
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            max-width: 400px;
+            width: 100%;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .login-logo {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .login-card h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .login-card p {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .google-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            background: white;
+            color: #1f2937;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s;
+            border: 1px solid #e5e7eb;
+        }
+
+        .google-btn:hover {
+            background: #f9fafb;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .google-icon {
+            width: 20px;
+            height: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <span class="login-logo">✨</span>
+            <h1>Hoş Geldiniz</h1>
+            <p>Dokümanlarınızla sohbet etmeye başlamak için giriş yapın.</p>
+
+            <div id="ip-warning"
+                style="display:none; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #ef4444; padding: 1rem; border-radius: 0.75rem; margin-bottom: 1.5rem; font-size: 0.85rem; text-align: left;">
+                <strong>⚠️ Dikkat:</strong> Şu an bir IP adresi üzerinden bağlısınız. Google Login <b>localhost</b> veya
+                gerçek bir alan adı dışında çalışmaz.
+                <br><br>
+                Lütfen adresi şu şekilde değiştirin:<br>
+                <code style="background: #000; padding: 2px 4px; border-radius: 4px;">http://localhost:5000</code>
+            </div>
+
+            <script>
+                if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                    document.getElementById('ip-warning').style.display = 'block';
+                }
+            </script>
+
+            <a href="{{ url_for('login') }}" class="google-btn">
+                <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" alt="Google"
+                    class="google-icon">
+                Google ile Giriş Yap
+            </a>
+
+            <div style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                <a href="{{ url_for('local_login') }}"
+                    style="color: var(--text-muted); text-decoration: none; font-size: 0.85rem;">
+                    🛠️ Yerel Giriş ile Devam Et (Test Modu)
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

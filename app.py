@@ -2,7 +2,7 @@ import os
 import yaml
 import uuid
 import time
-from flask import Flask, render_template, request, jsonify, session, Response
+from flask import Flask, render_template, request, jsonify, session, Response, redirect, url_for
 from werkzeug.utils import secure_filename
 from core.document_parser import DocumentParser
 from core.text_processor import TextProcessor
@@ -10,12 +10,9 @@ from core.embedding_client import EmbeddingClient
 from core.vector_db import VectorDB
 from core.ai_client_factory import AIClientFactory
 from utils.logger import setup_logger
-
-app = Flask(__name__)
-app.secret_key = str(uuid.uuid4())
-UPLOAD_FOLDER = 'data/uploads'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+from core.models import db, User, Chat, Message
+from core.auth import oauth, init_auth, handle_google_login, handle_google_callback
+from flask_login import LoginManager, login_required, current_user, logout_user
 
 # Load configuration
 def load_config():
@@ -23,6 +20,34 @@ def load_config():
         return yaml.safe_load(f)
 
 config = load_config()
+
+app = Flask(__name__)
+app.secret_key = config.get('model', {}).get('session_secret', str(uuid.uuid4()))
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.abspath('data/database.db')}"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['GOOGLE_AUTH'] = config.get('google_auth', {})
+
+UPLOAD_FOLDER = os.path.abspath('data/uploads')
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(os.path.abspath('data'), exist_ok=True)
+
+# Initialize extensions
+db.init_app(app)
+init_auth(app)
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+with app.app_context():
+    db.create_all()
+
+# Progress tracking
 
 # Progress tracking
 progress_data = {}
@@ -48,20 +73,54 @@ def get_components():
         api_key=model_cfg.get('api_key', '')
     )
     
-    db = VectorDB(
+    vector_db = VectorDB(
         db_path=rag_cfg.get('db_path', './data/vector_db'),
         collection_name=rag_cfg.get('collection_name', 'training_docs')
     )
     
     ai_client = AIClientFactory.create(model_cfg)
     
-    return embedding_client, db, ai_client
+    return embedding_client, vector_db, ai_client
 
-embedding_client, db, ai_client = get_components()
+embedding_client, vector_db, ai_client = get_components()
 
 @app.route('/')
 def index():
+    if not current_user.is_authenticated:
+        return render_template('login.html')
     return render_template('index.html')
+
+@app.route('/login')
+def login():
+    return handle_google_login()
+
+@app.route('/auth/callback')
+def auth_callback():
+    if handle_google_callback():
+        return redirect(url_for('index'))
+    return "Giriş başarısız", 400
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
+
+@app.route('/auth/local_login')
+def local_login():
+    # Only allow if Google credentials are placeholders or if explicitly permitted
+    user = User.query.filter_by(google_id='local_user').first()
+    if not user:
+        user = User(
+            google_id='local_user',
+            email='local@example.com',
+            name='Yerel Kullanıcı',
+            picture='https://ui-avatars.com/api/?name=Local+User'
+        )
+        db.session.add(user)
+        db.session.commit()
+    login_user(user)
+    return redirect(url_for('index'))
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -109,11 +168,11 @@ def upload_file():
                 
                 if len(documents) >= 10:
                     logger.debug(f"İndeksleniyor... ({i+1}/{total})")
-                    db.add_documents(documents, embeddings, metadatas, ids)
+                    vector_db.add_documents(documents, embeddings, metadatas, ids)
                     documents, embeddings, metadatas, ids = [], [], [], []
             
             if documents:
-                db.add_documents(documents, embeddings, metadatas, ids)
+                vector_db.add_documents(documents, embeddings, metadatas, ids)
             
             logger.info(f"✅ İndeksleme tamamlandı: {filename}")
             progress_data[job_id] = 100
@@ -128,15 +187,31 @@ def upload_file():
             return jsonify({"error": f"İşlem hatası: {str(e)}"}), 500
 
 @app.route('/ask', methods=['POST'])
+@login_required
 def ask_question():
     data = request.json
     query = data.get('query')
-    source = data.get('source') # Optional source filter
+    source = data.get('source')
+    chat_id = data.get('chat_id')
     
     if not query:
         return jsonify({"error": "Soru boş olamaz"}), 400
     
-    logger.info(f"❓ Soru: {query}" + (f" (Filtre: {source})" if source else ""))
+    # Ensure chat belongs to user or create a new one
+    active_chat = None
+    if chat_id:
+        active_chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first()
+    
+    if not active_chat:
+        active_chat = Chat(user_id=current_user.id, title=query[:30] + "...")
+        db.session.add(active_chat)
+        db.session.commit()
+    
+    # Save user message
+    user_msg = Message(chat_id=active_chat.id, role='user', content=query)
+    db.session.add(user_msg)
+    
+    logger.info(f"❓ Soru: {query} (Chat: {active_chat.id})")
     
     try:
         # 1. Get embedding
@@ -144,44 +219,81 @@ def ask_question():
         
         # 2. Query Vector DB
         rag_cfg = config.get('rag', {})
-        results = db.query(query_emb, n_results=rag_cfg.get('top_k', 3), source=source)
+        results = vector_db.query(query_emb, n_results=rag_cfg.get('top_k', 3), source=source)
         
         contexts = results.get('documents', [[]])[0]
         metadatas = results.get('metadatas', [[]])[0]
         
-        logger.debug(f"🔍 {len(contexts)} bağlam bulundu.")
-        for idx, (c, m) in enumerate(zip(contexts, metadatas)):
-            logger.debug(f"Bağlam {idx+1} ({m['source']}): {c[:100]}...")
-
         context_text = "\n\n".join([f"[Kaynak: {m['source']}]\n{c}" for c, m in zip(contexts, metadatas)])
         
         # 3. Prompt
-        prompt = f"""Bağlam:
-{context_text}
-
-Soru: {query}
-
-Cevap:"""
+        prompt = f"Bağlam:\n{context_text}\n\nSoru: {query}\n\nCevap:"
 
         # 4. Generate
-        logger.debug("AI cevabı oluşturuluyor...")
         answer = ai_client.generate(prompt)
-        logger.info(f"🤖 Cevap üretildi ({len(answer)} karakter)")
+        
+        # Save bot message
+        bot_msg = Message(chat_id=active_chat.id, role='bot', content=answer)
+        sources_list = list(set(m['source'] for m in metadatas)) if contexts else []
+        bot_msg.set_sources(sources_list)
+        db.session.add(bot_msg)
+        db.session.commit()
         
         return jsonify({
             "answer": answer,
-            "sources": list(set(m['source'] for m in metadatas)) if contexts else []
+            "sources": sources_list,
+            "chat_id": active_chat.id,
+            "chat_title": active_chat.title
         })
         
     except Exception as e:
         logger.error(f"❌ Hata: {str(e)}")
-        return jsonify({"error": f"Soru işlenirken hata oluştu: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/chats', methods=['GET', 'POST'])
+@login_required
+def handle_chats():
+    if request.method == 'GET':
+        chats = Chat.query.filter_by(user_id=current_user.id).order_by(Chat.updated_at.desc()).all()
+        logger.info(f"👤 Kullanıcı {current_user.id} sohbet geçmişini istedi. Bulunan: {len(chats)}")
+        return jsonify([{
+            "id": c.id,
+            "title": c.title,
+            "updated_at": c.updated_at.isoformat()
+        } for c in chats])
+    else:
+        # Create new chat
+        new_chat = Chat(user_id=current_user.id)
+        db.session.add(new_chat)
+        db.session.commit()
+        return jsonify({"id": new_chat.id, "title": new_chat.title})
+
+@app.route('/chats/<int:chat_id>', methods=['GET', 'DELETE'])
+@login_required
+def chat_detail(chat_id):
+    chat = Chat.query.filter_by(id=chat_id, user_id=current_user.id).first_or_404()
+    if request.method == 'GET':
+        messages = Message.query.filter_by(chat_id=chat.id).order_by(Message.timestamp.asc()).all()
+        return jsonify({
+            "id": chat.id,
+            "title": chat.title,
+            "messages": [{
+                "role": m.role,
+                "content": m.content,
+                "sources": m.get_sources(),
+                "timestamp": m.timestamp.isoformat()
+            } for m in messages]
+        })
+    else:
+        db.session.delete(chat)
+        db.session.commit()
+        return jsonify({"message": "Sohbet silindi"})
 
 @app.route('/stats', methods=['GET'])
 def get_stats():
     try:
-        count = db.get_collection_count()
-        sources = db.get_unique_sources()
+        count = vector_db.get_collection_count()
+        sources = vector_db.get_unique_sources()
         return jsonify({
             "count": count,
             "sources": sources,
@@ -215,7 +327,7 @@ def delete_source():
     
     try:
         logger.info(f"🗑️ Kaynak siliniyor: {source}")
-        db.delete_by_source(source)
+        vector_db.delete_by_source(source)
         return jsonify({"message": f"'{source}' başarıyla silindi."})
     except Exception as e:
         logger.error(f"Silme hatası: {str(e)}")
@@ -225,11 +337,39 @@ def delete_source():
 def reset_db():
     try:
         logger.warning("🚨 Tüm veri tabanı sıfırlanıyor!")
-        db.reset()
+        vector_db.reset()
         return jsonify({"message": "Tüm veri tabanı başarıyla sıfırlandı."})
     except Exception as e:
         logger.error(f"Sıfırlama hatası: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/config', methods=['GET', 'POST'])
+def handle_config():
+    global config, embedding_client, vector_db, ai_client
+    if request.method == 'GET':
+        return jsonify(config)
+    else:
+        try:
+            new_config = request.json
+            with open('config/config.yaml', 'w', encoding='utf-8') as f:
+                yaml.dump(new_config, f, allow_unicode=True, default_flow_style=False)
+            
+            # Reload components
+            config = new_config
+            embedding_client, vector_db, ai_client = get_components()
+            logger.info("⚙️ Ayarlar güncellendi ve bileşenler yeniden yüklendi.")
+            return jsonify({"message": "Ayarlar başarıyla kaydedildi."})
+        except Exception as e:
+            logger.error(f"Config kaydetme hatası: {str(e)}")
+            return jsonify({"error": str(e)}), 500
+
+@app.route('/available_models', methods=['GET'])
+def get_available_models():
+    try:
+        models = ai_client.get_available_models()
+        return jsonify({"models": models})
+    except Exception as e:
+        return jsonify({"models": []})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

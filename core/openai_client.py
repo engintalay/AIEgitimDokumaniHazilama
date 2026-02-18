@@ -55,3 +55,15 @@ class OpenAIClient(AIClient):
             return response.status_code == 200
         except:
             return False
+
+    def get_available_models(self) -> list:
+        """Fetch models from OpenAI."""
+        if not self.api_key: return []
+        try:
+            headers = {"Authorization": f"Bearer {self.api_key}"}
+            response = requests.get("https://api.openai.com/v1/models", headers=headers, timeout=5)
+            response.raise_for_status()
+            models = response.json().get('data', [])
+            return [m['id'] for m in models]
+        except:
+            return []

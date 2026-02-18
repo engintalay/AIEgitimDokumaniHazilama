@@ -1,64 +1,50 @@
-# AI Eğitim Dokümanı Hazırlama - Konfigürasyon
-
-# AI Model Ayarları
-model:
-  type: "lmstudio"  # ollama, lmstudio, openai, llamacpp
-  name: "turkish-llama-8b-instruct-v0.1"  # LM Studio'daki tam ID
-  endpoint: "http://127.0.0.1:1234"  # LM Studio default port
-  #endpoint: "http://127.0.0.1:11434"  # Ollama default port
-  api_key: ""  # Opsiyonel (OpenAI vb. için)
-  
-  # Model parametreleri
-  temperature: 0.3  # Düşük = daha tutarlı, yüksek = daha yaratıcı
-  max_tokens: 512  # Token limitini düşürdük
-  timeout: 300  # saniye (5 dakika)
-  retry_attempts: 2
-  retry_delay: 3  # saniye
-  
-  # Prompt formatı (model'e göre özelleştirilebilir)
-  use_system_prompt: true  # System prompt kullan
-  system_prompt: "Sen bir Türkçe eğitim dataset uzmanısın. Verilen bağlam bilgilerine göre soruları yanıtla."
-  
-  # JSON çıktı formatı
-  json_mode: false  # JSON mode aktif (LM Studio bazı versiyonlarda desteklemeyebilir)
-  json_wrapper: "questions"  # JSON'da wrapper key (boş ise direkt array)
-
-# Soru üretimi ayarları
-generation:
-  min_questions_per_paragraph: 2  # Azaltıldı - daha hızlı
-  max_questions_per_paragraph: 5  # Azaltıldı - daha hızlı
-  skip_short_paragraphs: true
-  min_paragraph_length: 70 # karakter (çok kısa paragrafları atla)
-
-# Çıktı ayarları
-output:
-  directory: "./data/output"
-  filename: "dataset.jsonl"
-  append_mode: true  # Var olan dosyaya ekle
-  
-# Checkpoint ayarları
 checkpoint:
+  directory: ./data/checkpoints
   enabled: true
-  directory: "./data/checkpoints"
-  save_interval: 5  # Her 5 paragrafta bir kaydet
-
-# İlerleme gösterimi
+  save_interval: 5
+generation:
+  max_questions_per_paragraph: 5
+  min_paragraph_length: 70
+  min_questions_per_paragraph: 2
+  skip_short_paragraphs: true
+logging:
+  console: true
+  file: ./data/logs/app.log
+  level: DEBUG
+  show_ai_requests: true
+model:
+  api_key: ''
+  endpoint: http://127.0.0.1:1234
+  json_mode: false
+  json_wrapper: questions
+  max_tokens: 4096
+  name: mistral-7b-instruct-v0.2-turkish
+  retry_attempts: 2
+  retry_delay: 3
+  system_prompt: Sen bir Türkçe eğitim dataset uzmanısın. Verilen bağlam bilgilerine
+    göre soruları yanıtla.
+  temperature: 0.3
+  timeout: 300
+  type: lmstudio
+  use_system_prompt: true
+output:
+  append_mode: true
+  directory: ./data/output
+  filename: dataset.jsonl
 progress:
   show_detailed: true
   show_eta: true
   show_speed: true
-  update_interval: 1  # saniye
-
-# Loglama
-logging:
-  level: "DEBUG"  # DEBUG (detaylı), INFO, WARNING, ERROR
-  file: "./data/logs/app.log"
-  console: true
-  show_ai_requests: true  # true yapınca AI istek/cevapları gösterilir
-
-# RAG (Vector Search) Ayarları
+  update_interval: 1
 rag:
-  db_path: "./data/vector_db"
-  collection_name: "training_docs"
-  embedding_model: "text-embedding-nomic-embed-text-v1.5"  # LM Studio için tam ID
-  top_k: 2  # Bağlam sayısını 2'ye düşürdük
+  collection_name: training_docs
+  db_path: ./data/vector_db
+  embedding_model: text-embedding-nomic-embed-text-v1.5
+  top_k: 2
+
+# Google OAuth Ayarları
+google_auth:
+  client_id: "Enter your client ID"
+  client_secret: "Enter your client secret"
+  # Eğer redirect_uri hatası alıyorsanız kısıtlamayı buraya elle girebilirsiniz:
+  redirect_uri: "http://localhost:5000/auth/callback"

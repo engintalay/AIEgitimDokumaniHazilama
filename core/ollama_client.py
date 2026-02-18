@@ -63,3 +63,14 @@ class OllamaClient(AIClient):
             return response.status_code == 200
         except:
             return False
+
+    def get_available_models(self) -> list:
+        """Fetch models from Ollama /api/tags."""
+        try:
+            response = self.session.get(f"{self.endpoint}/api/tags", timeout=5)
+            response.raise_for_status()
+            models = response.json().get('models', [])
+            return [m['name'] for m in models]
+        except Exception as e:
+            logger.error(f"Ollama model fetch failed: {e}")
+            return []
