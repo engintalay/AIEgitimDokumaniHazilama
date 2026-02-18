@@ -134,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
         userInput.value = '';
         userInput.style.height = 'auto';
 
-        addMessage('user', query);
+        addMessage('user', query + (selectedSource ? ` (Dosya: ${selectedSource})` : ''));
 
         const loadingMsg = addMessage('bot', 'Düşünüyorum...', true);
 
@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query })
+                body: JSON.stringify({ query, source: selectedSource })
             });
 
             const data = await response.json();
