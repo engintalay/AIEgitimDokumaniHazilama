@@ -22,10 +22,29 @@ class VectorDB:
             ids=ids
         )
 
-    def query(self, query_embedding: List[float], n_results: int = 3, source: Optional[str] = None) -> Dict[str, Any]:
-        """Search for most similar documents with optional source filtering."""
-        where = {"source": source} if source else None
+    def query(self, query_embedding: List[float], n_results: int = 3, user_id: Optional[int] = None, source: Optional[str] = None) -> Dict[str, Any]:
+        """Search for most similar documents with ownership and optional source filtering."""
+        filters = []
         
+        # Ownership/Public Filter
+        if user_id is not None:
+            filters.append({"$or": [
+                {"user_id": user_id},
+                {"is_public": True}
+            ]})
+        
+        # Source Filter
+        if source:
+            filters.append({"source": source})
+            
+        # Combine filters
+        if len(filters) == 1:
+            where = filters[0]
+        elif len(filters) > 1:
+            where = {"$and": filters}
+        else:
+            where = None
+            
         results = self.collection.query(
             query_embeddings=[query_embedding],
             n_results=n_results,
@@ -37,19 +56,59 @@ class VectorDB:
         """Return total document count in collection."""
         return self.collection.count()
 
-    def get_unique_sources(self) -> List[str]:
-        """Return list of unique source filenames in the DB."""
-        data = self.collection.get(include=['metadatas'])
-        sources = set()
+    def get_unique_sources(self, user_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Return list of unique source filenames with their metadata (owner, shared status)."""
+        where = None
+        if user_id is not None:
+             where = {"$or": [
+                {"user_id": user_id},
+                {"is_public": True}
+            ]}
+             
+        data = self.collection.get(include=['metadatas'], where=where)
+        sources_map = {}
         if data and data['metadatas']:
             for m in data['metadatas']:
                 if m and 'source' in m:
-                    sources.add(m['source'])
-        return sorted(list(sources))
+                    src = m['source']
+                    if src not in sources_map:
+                        sources_map[src] = {
+                            "name": src,
+                            "user_id": m.get('user_id'),
+                            "is_public": m.get('is_public', False),
+                            "is_owner": m.get('user_id') == user_id
+                        }
+        return sorted(list(sources_map.values()), key=lambda x: x['name'])
 
-    def delete_by_source(self, source: str):
-        """Delete all documents associated with a specific source."""
-        self.collection.delete(where={"source": source})
+    def delete_by_source(self, source: str, user_id: int):
+        """Delete documents associated with a source only if current user is owner."""
+        # Note: We must ensure user_id matches to prevent unauthorized deletions
+        self.collection.delete(where={"$and": [
+            {"source": source},
+            {"user_id": user_id}
+        ]})
+
+    def update_visibility(self, source: str, user_id: int, is_public: bool):
+        """Update is_public status for all documents of a source owned by user."""
+        # ChromaDB doesn't have a direct "update metadata by where" easily in some versions.
+        # We might need to get all IDs and update them.
+        data = self.collection.get(where={"$and": [
+            {"source": source},
+            {"user_id": user_id}
+        ]}, include=['metadatas'])
+        
+        if data and data['ids']:
+            new_metadatas = []
+            for m in data['metadatas']:
+                m['is_public'] = is_public
+                new_metadatas.append(m)
+            
+            self.collection.update(
+                ids=data['ids'],
+                metadatas=new_metadatas
+            )
+            return True
+        return False
 
     def reset(self):
         """Clear all documents in the collection."""

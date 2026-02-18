@@ -16,18 +16,24 @@ class OllamaClient(AIClient):
         self.session = requests.Session()
         self.session.trust_env = False  # Proxy ayarlarını yoksay
     
-    def generate(self, prompt: str) -> str:
-        """Generate response from Ollama."""
+    def generate(self, prompt: str, options: Dict[str, Any] = None) -> str:
+        """Generate response from Ollama with optional parameter overrides."""
         url = f"{self.endpoint}/api/generate"
         
+        # Merge options into defaults
+        opts = {
+            "temperature": self.temperature,
+            "num_predict": self.max_tokens
+        }
+        if options:
+            if 'temperature' in options: opts['temperature'] = float(options['temperature'])
+            if 'max_tokens' in options: opts['num_predict'] = int(options['max_tokens'])
+
         payload = {
             "model": self.model_name,
             "prompt": prompt,
             "stream": False,
-            "options": {
-                "temperature": self.temperature,
-                "num_predict": self.max_tokens
-            }
+            "options": opts
         }
         
         # Log request

@@ -10,10 +10,14 @@ logger = logging.getLogger(__name__)
 class LlamaCppClient(AIClient):
     """llama.cpp AI client (OpenAI-compatible API via llama-server)."""
     
-    def generate(self, prompt: str) -> str:
-        """Generate response from llama.cpp server."""
+    def generate(self, prompt: str, options: Dict[str, Any] = None) -> str:
+        """Generate response from llama.cpp server with optional parameter overrides."""
         url = f"{self.endpoint}/v1/chat/completions"
         
+        # Merge options into defaults
+        temp = float(options.get('temperature', self.temperature)) if options and 'temperature' in options else self.temperature
+        tokens = int(options.get('max_tokens', self.max_tokens)) if options and 'max_tokens' in options else self.max_tokens
+
         # Build messages based on config
         messages = []
         if self.use_system_prompt and self.system_prompt:
@@ -22,8 +26,8 @@ class LlamaCppClient(AIClient):
         
         payload = {
             "messages": messages,
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens
+            "temperature": temp,
+            "max_tokens": tokens
         }
         
         # Log request

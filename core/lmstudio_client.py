@@ -10,10 +10,14 @@ logger = logging.getLogger(__name__)
 class LMStudioClient(AIClient):
     """LM Studio AI client (OpenAI-compatible API)."""
     
-    def generate(self, prompt: str) -> str:
-        """Generate response from LM Studio."""
+    def generate(self, prompt: str, options: Dict[str, Any] = None) -> str:
+        """Generate response from LM Studio with optional parameter overrides."""
         url = f"{self.endpoint}/v1/chat/completions"
         
+        # Merge options into defaults
+        temp = float(options.get('temperature', self.temperature)) if options and 'temperature' in options else self.temperature
+        tokens = int(options.get('max_tokens', self.max_tokens)) if options and 'max_tokens' in options else self.max_tokens
+
         # Build messages based on config
         messages = []
         if self.use_system_prompt and self.system_prompt:
@@ -26,8 +30,8 @@ class LMStudioClient(AIClient):
         payload = {
             "model": self.model_name,
             "messages": messages,
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens
+            "temperature": temp,
+            "max_tokens": tokens
         }
         
         # Add JSON mode if enabled (some LM Studio versions may not support this)

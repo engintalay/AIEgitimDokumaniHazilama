@@ -7,6 +7,10 @@ generation:
   min_paragraph_length: 70
   min_questions_per_paragraph: 2
   skip_short_paragraphs: true
+google_auth:
+  client_id: "YOUR_GOOGLE_CLIENT_ID"
+  client_secret: "YOUR_GOOGLE_CLIENT_SECRET"
+  redirect_uri: http://localhost:5000/auth/callback
 logging:
   console: true
   file: ./data/logs/app.log
@@ -18,7 +22,7 @@ model:
   json_mode: false
   json_wrapper: questions
   max_tokens: 4096
-  name: mistral-7b-instruct-v0.2-turkish
+  name: llava-1.6-mistral-7b
   retry_attempts: 2
   retry_delay: 3
   system_prompt: Sen bir Türkçe eğitim dataset uzmanısın. Verilen bağlam bilgilerine
@@ -41,10 +45,3 @@ rag:
   db_path: ./data/vector_db
   embedding_model: text-embedding-nomic-embed-text-v1.5
   top_k: 2
-
-# Google OAuth Ayarları
-google_auth:
-  client_id: "YOUR_GOOGLE_CLIENT_ID"
-  client_secret: "YOUR_GOOGLE_CLIENT_SECRET"
-  # Eğer redirect_uri hatası alıyorsanız kısıtlamayı buraya elle girebilirsiniz:
-  redirect_uri: "http://localhost:5000/auth/callback"

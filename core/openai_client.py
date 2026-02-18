@@ -11,10 +11,14 @@ class OpenAIClient(AIClient):
         super().__init__(config)
         self.api_key = config.get('api_key', '')
     
-    def generate(self, prompt: str) -> str:
-        """Generate response from OpenAI."""
+    def generate(self, prompt: str, options: Dict[str, Any] = None) -> str:
+        """Generate response from OpenAI with optional parameter overrides."""
         url = "https://api.openai.com/v1/chat/completions"
         
+        # Merge options into defaults
+        temp = float(options.get('temperature', self.temperature)) if options and 'temperature' in options else self.temperature
+        tokens = int(options.get('max_tokens', self.max_tokens)) if options and 'max_tokens' in options else self.max_tokens
+
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
@@ -25,8 +29,8 @@ class OpenAIClient(AIClient):
             "messages": [
                 {"role": "user", "content": prompt}
             ],
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens
+            "temperature": temp,
+            "max_tokens": tokens
         }
         
         try:

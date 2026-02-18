@@ -277,21 +277,39 @@ document.addEventListener('DOMContentLoaded', () => {
         dbSources.innerHTML = '';
         sources.forEach(source => {
             const div = document.createElement('div');
-            div.className = `source-item ${selectedSource === source ? 'selected' : ''}`;
+            div.className = `source-item ${selectedSource === source.name ? 'selected' : ''}`;
+
+            const privacyIcon = source.is_public ? '🌐' : '🔒';
+            const privacyTitle = source.is_public ? 'Herkes görebilir' : 'Sadece siz';
+
+            let actionHtml = '';
+            if (source.is_owner) {
+                actionHtml = `
+                    <button class="toggle-public-btn" data-source="${source.name}" data-public="${source.is_public}" title="${source.is_public ? 'Özel yap' : 'Paylaş'}">
+                        ${privacyIcon}
+                    </button>
+                    <button class="delete-source-btn" data-source="${source.name}" title="Bu kaynağı sil">🗑️</button>
+                `;
+            } else {
+                actionHtml = `<span class="shared-badge" title="Paylaşılan doküman">${privacyIcon}</span>`;
+            }
+
             div.innerHTML = `
-                <span title="${source}">${source.length > 20 ? source.substring(0, 17) + '...' : source}</span>
-                <button class="delete-source-btn" data-source="${source}" title="Bu kaynağı sil">🗑️</button>
+                <span title="${source.name}">${source.name.length > 20 ? source.name.substring(0, 17) + '...' : source.name}</span>
+                <div class="source-actions">
+                    ${actionHtml}
+                </div>
             `;
 
             div.onclick = (e) => {
-                if (e.target.classList.contains('delete-source-btn')) return;
+                if (e.target.closest('button')) return;
 
-                if (selectedSource === source) {
+                if (selectedSource === source.name) {
                     selectedSource = null;
                     div.classList.remove('selected');
                 } else {
                     document.querySelectorAll('.source-item').forEach(i => i.classList.remove('selected'));
-                    selectedSource = source;
+                    selectedSource = source.name;
                     div.classList.add('selected');
                 }
             };
@@ -302,12 +320,39 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add delete listeners
         document.querySelectorAll('.delete-source-btn').forEach(btn => {
             btn.onclick = async (e) => {
-                const source = e.target.getAttribute('data-source');
+                const source = e.currentTarget.getAttribute('data-source');
                 if (confirm(`'${source}' kaynağını ve ilgili tüm paragrafları silmek istediğinize emin misiniz?`)) {
                     await deleteSource(source);
                 }
             };
         });
+
+        // Add toggle listeners
+        document.querySelectorAll('.toggle-public-btn').forEach(btn => {
+            btn.onclick = async (e) => {
+                const source = e.currentTarget.getAttribute('data-source');
+                const isPublic = e.currentTarget.getAttribute('data-public') === 'true';
+                await togglePublic(source, !isPublic);
+            };
+        });
+    }
+
+    async function togglePublic(source, isPublic) {
+        try {
+            const response = await fetch('/toggle_public', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ source, is_public: isPublic })
+            });
+            const data = await response.json();
+            if (data.error) alert(data.error);
+            else {
+                addMessage('bot', `🌐 ${data.message}`);
+                updateStats();
+            }
+        } catch (err) {
+            console.error(err);
+        }
     }
 
     async function deleteSource(source) {
@@ -329,27 +374,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    resetDbBtn.onclick = async () => {
-        if (confirm('TÜM veri tabanını sıfırlamak istediğinize emin misiniz? Bu işlem geri alınamaz.')) {
-            try {
-                const response = await fetch('/reset_db', { method: 'POST' });
-                const data = await response.json();
-                if (data.error) alert(data.error);
-                else {
-                    addMessage('bot', `🚨 ${data.message}`);
-                    updateStats();
+    if (resetDbBtn) {
+        resetDbBtn.onclick = async () => {
+            if (confirm('TÜM veri tabanını sıfırlamak istediğinize emin misiniz? Bu işlem geri alınamaz.')) {
+                try {
+                    const response = await fetch('/reset_db', { method: 'POST' });
+                    const data = await response.json();
+                    if (data.error) alert(data.error);
+                    else {
+                        addMessage('bot', `🚨 ${data.message}`);
+                        updateStats();
+                    }
+                } catch (err) {
+                    console.error(err);
                 }
-            } catch (err) {
-                console.error(err);
             }
-        }
-    };
+        };
+    }
 
     function addMessage(role, text, isLoading = false, sources = []) {
         const div = document.createElement('div');
         div.className = `message ${role}-message`;
 
-        let html = `<div class="message-content">${text.replace(/\n/g, '<br>')}</div>`;
+        let actionHtml = '';
+        if (role === 'user' && !isLoading) {
+            actionHtml = `
+                <div class="message-actions">
+                    <button class="action-btn copy-btn" title="Kopyala">📋</button>
+                    <button class="action-btn rerun-btn" title="Tekrar Çalıştır">🔄</button>
+                </div>
+            `;
+        }
+
+        let html = `<div class="message-content">${text.replace(/\n/g, '<br>')}</div>${actionHtml}`;
 
         if (sources && sources.length > 0) {
             html += `<div class="sources">Kaynaklar: ${sources.join(', ')}</div>`;
@@ -358,6 +415,20 @@ document.addEventListener('DOMContentLoaded', () => {
         div.innerHTML = html;
         chatWindow.appendChild(div);
         chatWindow.scrollTop = chatWindow.scrollHeight;
+
+        // Add action listeners
+        if (role === 'user' && !isLoading) {
+            const cleanText = text.includes(' (Dosya:') ? text.split(' (Dosya:')[0] : text;
+            div.querySelector('.copy-btn').onclick = () => {
+                userInput.value = cleanText;
+                userInput.focus();
+                userInput.dispatchEvent(new Event('input')); // Trigger auto-resize
+            };
+            div.querySelector('.rerun-btn').onclick = () => {
+                userInput.value = cleanText;
+                sendMessage();
+            };
+        }
 
         return div;
     }

@@ -11,6 +11,8 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(100), unique=True, nullable=False)
     name = db.Column(db.String(100))
     picture = db.Column(db.String(255))
+    is_admin = db.Column(db.Boolean, default=False)
+    settings = db.Column(db.Text) # Stored as JSON string
     chats = db.relationship('Chat', backref='user', lazy=True, cascade="all, delete-orphan")
 
 class Chat(db.Model):

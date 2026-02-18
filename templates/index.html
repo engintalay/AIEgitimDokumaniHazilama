@@ -56,7 +56,9 @@
                 <div class="stats-section">
                     <div class="stats-header">
                         <h3>Veri Tabanı</h3>
+                        {% if current_user.is_admin %}
                         <button id="reset-db-btn" class="text-btn danger" title="Tümünü Sıfırla">Sıfırla</button>
+                        {% endif %}
                     </div>
                     <div class="stats-grid">
                         <div class="stat-card">

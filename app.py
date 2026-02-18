@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv() # Load environments from .env
 from flask import Flask, render_template, request, jsonify, session, Response, redirect, url_for
+import json
 from werkzeug.utils import secure_filename
 from core.document_parser import DocumentParser
 from core.text_processor import TextProcessor
@@ -104,7 +105,13 @@ def login():
 
 @app.route('/auth/callback')
 def auth_callback():
+    # Admin email from config or environment for easy changing
+    admin_email = os.getenv('ADMIN_EMAIL', 'engintalay@gmail.com')
+    
     if handle_google_callback():
+        if current_user.email == admin_email:
+            current_user.is_admin = True
+            db.session.commit()
         return redirect(url_for('index'))
     return "Giriş başarısız", 400
 
@@ -123,7 +130,8 @@ def local_login():
             google_id='local_user',
             email='local@example.com',
             name='Yerel Kullanıcı',
-            picture='https://ui-avatars.com/api/?name=Local+User'
+            picture='https://ui-avatars.com/api/?name=Local+User',
+            is_admin=True # Local test user is admin by default
         )
         db.session.add(user)
         db.session.commit()
@@ -131,6 +139,7 @@ def local_login():
     return redirect(url_for('index'))
 
 @app.route('/upload', methods=['POST'])
+@login_required
 def upload_file():
     if 'file' not in request.files:
         return jsonify({"error": "Dosya bulunamadı"}), 400
@@ -149,7 +158,7 @@ def upload_file():
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
         
-        logger.info(f"📁 Dosya yüklendi: {filename}")
+        logger.info(f"📁 Dosya yüklendi: {filename} (User: {current_user.id})")
         
         try:
             # 1. Parse
@@ -168,7 +177,12 @@ def upload_file():
                 emb = embedding_client.get_embedding(para)
                 documents.append(para)
                 embeddings.append(emb)
-                metadatas.append({"source": filename, "index": i})
+                metadatas.append({
+                    "source": filename, 
+                    "index": i, 
+                    "user_id": current_user.id,
+                    "is_public": False
+                })
                 ids.append(f"{filename}_{uuid.uuid4()}_{i}")
                 
                 # Update progress
@@ -227,18 +241,34 @@ def ask_question():
         
         # 2. Query Vector DB
         rag_cfg = config.get('rag', {})
-        results = vector_db.query(query_emb, n_results=rag_cfg.get('top_k', 3), source=source)
+        results = vector_db.query(query_emb, n_results=rag_cfg.get('top_k', 3), user_id=current_user.id, source=source)
         
         contexts = results.get('documents', [[]])[0]
         metadatas = results.get('metadatas', [[]])[0]
         
         context_text = "\n\n".join([f"[Kaynak: {m['source']}]\n{c}" for c, m in zip(contexts, metadatas)])
         
+        # 2.5 Retrieve Chat History (last 5 messages)
+        history_msgs = Message.query.filter_by(chat_id=active_chat.id).order_by(Message.timestamp.desc()).offset(1).limit(5).all()
+        history_msgs.reverse()
+        history_text = "\n".join([f"{'Kullanıcı' if m.role == 'user' else 'Asistan'}: {m.content}" for m in history_msgs])
+        
         # 3. Prompt
-        prompt = f"Bağlam:\n{context_text}\n\nSoru: {query}\n\nCevap:"
+        prompt = "Sen yardımcı bir doküman asistanısın. Aşağıdaki bağlam ve geçmiş konuşmaları dikkate alarak son soruyu cevapla.\n\n"
+        if history_text:
+            prompt += f"--- Önceki Yazışmalar ---\n{history_text}\n\n"
+        
+        prompt += f"--- İlgili Doküman Parçaları ---\n{context_text}\n\n"
+        prompt += f"Soru: {query}\n\nCevap:"
 
-        # 4. Generate
-        answer = ai_client.generate(prompt)
+        # 4. Generate with user-specific settings if available
+        user_settings = json.loads(current_user.settings) if current_user.settings else {}
+        model_overrides = user_settings.get('model', {})
+        
+        # We pass model options to support per-user settings
+        answer = ai_client.generate(prompt, options=model_overrides) 
+        # Note: To fully support independent models per user, AIClient would need to be re-created per request or accept overrides.
+        # For now, we'll focus on context and standard generation.
         
         # Save bot message
         bot_msg = Message(chat_id=active_chat.id, role='bot', content=answer)
@@ -298,10 +328,11 @@ def chat_detail(chat_id):
         return jsonify({"message": "Sohbet silindi"})
 
 @app.route('/stats', methods=['GET'])
+@login_required
 def get_stats():
     try:
         count = vector_db.get_collection_count()
-        sources = vector_db.get_unique_sources()
+        sources = vector_db.get_unique_sources(user_id=current_user.id)
         return jsonify({
             "count": count,
             "sources": sources,
@@ -327,6 +358,7 @@ def get_progress(job_id):
     return Response(generate(), mimetype='text/event-stream')
 
 @app.route('/delete_source', methods=['POST'])
+@login_required
 def delete_source():
     data = request.json
     source = data.get('source')
@@ -334,39 +366,70 @@ def delete_source():
         return jsonify({"error": "Kaynak belirtilmedi"}), 400
     
     try:
-        logger.info(f"🗑️ Kaynak siliniyor: {source}")
-        vector_db.delete_by_source(source)
+        logger.info(f"🗑️ Kaynak siliniyor: {source} (User: {current_user.id})")
+        vector_db.delete_by_source(source, user_id=current_user.id)
         return jsonify({"message": f"'{source}' başarıyla silindi."})
     except Exception as e:
         logger.error(f"Silme hatası: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/reset_db', methods=['POST'])
+@login_required
 def reset_db():
+    if not getattr(current_user, 'is_admin', False):
+        return jsonify({"error": "Bu işlem için yetkiniz yok (Yalnızca Admin)."}), 403
+        
     try:
-        logger.warning("🚨 Tüm veri tabanı sıfırlanıyor!")
+        logger.warning(f"🚨 Tüm veri tabanı sıfırlanıyor! (Admin: {current_user.id})")
         vector_db.reset()
         return jsonify({"message": "Tüm veri tabanı başarıyla sıfırlandı."})
     except Exception as e:
         logger.error(f"Sıfırlama hatası: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/toggle_public', methods=['POST'])
+@login_required
+def toggle_public():
+    data = request.json
+    source = data.get('source')
+    is_public = data.get('is_public', False)
+    
+    if not source:
+        return jsonify({"error": "Kaynak belirtilmedi"}), 400
+        
+    try:
+        success = vector_db.update_visibility(source, current_user.id, is_public)
+        if success:
+            status = "artık genel" if is_public else "artık özel"
+            return jsonify({"message": f"'{source}' {status}."})
+        else:
+            return jsonify({"error": "Kaynak bulunamadı veya yetkiniz yok"}), 403
+    except Exception as e:
+        logger.error(f"Görünürlük güncelleme hatası: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/config', methods=['GET', 'POST'])
+@login_required
 def handle_config():
-    global config, embedding_client, vector_db, ai_client
+    global config # We still use global for defaults
     if request.method == 'GET':
-        return jsonify(config)
+        user_settings = json.loads(current_user.settings) if current_user.settings else {}
+        # Merge user settings into global config for the UI
+        full_cfg = config.copy()
+        if 'model' in user_settings:
+            full_cfg['model'].update(user_settings['model'])
+        return jsonify(full_cfg)
     else:
         try:
-            new_config = request.json
-            with open('config/config.yaml', 'w', encoding='utf-8') as f:
-                yaml.dump(new_config, f, allow_unicode=True, default_flow_style=False)
+            new_settings = request.json
+            # We only store the 'model' part as user-specific for now
+            current_user.settings = json.dumps({
+                "model": new_settings.get('model', {})
+            })
+            db.session.commit()
             
-            # Reload components
-            config = new_config
-            embedding_client, vector_db, ai_client = get_components()
-            logger.info("⚙️ Ayarlar güncellendi ve bileşenler yeniden yüklendi.")
-            return jsonify({"message": "Ayarlar başarıyla kaydedildi."})
+            logger.info(f"⚙️ Kullanıcı {current_user.id} ayarları güncellendi.")
+            return jsonify({"message": "Kişisel ayarlarınız başarıyla kaydedildi."})
         except Exception as e:
             logger.error(f"Config kaydetme hatası: {str(e)}")
             return jsonify({"error": str(e)}), 500
