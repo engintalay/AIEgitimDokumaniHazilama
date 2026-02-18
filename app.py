@@ -2,6 +2,9 @@ import os
 import yaml
 import uuid
 import time
+from dotenv import load_dotenv
+
+load_dotenv() # Load environments from .env
 from flask import Flask, render_template, request, jsonify, session, Response, redirect, url_for
 from werkzeug.utils import secure_filename
 from core.document_parser import DocumentParser
@@ -22,10 +25,15 @@ def load_config():
 config = load_config()
 
 app = Flask(__name__)
-app.secret_key = config.get('model', {}).get('session_secret', str(uuid.uuid4()))
+app.secret_key = os.getenv('SESSION_SECRET', config.get('model', {}).get('session_secret', str(uuid.uuid4())))
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.abspath('data/database.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['GOOGLE_AUTH'] = config.get('google_auth', {})
+
+# Google Auth Config from Env or YAML
+google_auth = config.get('google_auth', {})
+google_auth['client_id'] = os.getenv('GOOGLE_CLIENT_ID', google_auth.get('client_id'))
+google_auth['client_secret'] = os.getenv('GOOGLE_CLIENT_SECRET', google_auth.get('client_secret'))
+app.config['GOOGLE_AUTH'] = google_auth
 
 UPLOAD_FOLDER = os.path.abspath('data/uploads')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER

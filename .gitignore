@@ -75,3 +75,6 @@ config/local.yaml
 # OS
 Thumbs.db
 
+# Secrets
+.env
+

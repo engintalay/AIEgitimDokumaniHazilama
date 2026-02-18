@@ -44,7 +44,7 @@ rag:
 
 # Google OAuth Ayarları
 google_auth:
-  client_id: "Enter your client ID"
-  client_secret: "Enter your client secret"
+  client_id: "YOUR_GOOGLE_CLIENT_ID"
+  client_secret: "YOUR_GOOGLE_CLIENT_SECRET"
   # Eğer redirect_uri hatası alıyorsanız kısıtlamayı buraya elle girebilirsiniz:
   redirect_uri: "http://localhost:5000/auth/callback"
