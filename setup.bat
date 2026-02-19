@@ -28,12 +28,20 @@ if not exist "data\logs" mkdir data\logs
 if not exist "data\images" mkdir data\images
 if not exist "data\vector_db" mkdir data\vector_db
 if not exist "data\uploads" mkdir data\uploads
+if not exist "data\database" mkdir data\database
+
+REM .env dosyası kontrolü
+if not exist ".env" (
+    echo .env dosyasi bulunamadi, .env.template kullanilarak olusturuluyor...
+    copy .env.template .env
+    echo LUTFEN .env DOSYASINI KENDI BILGILERINIZLE GUNCELLEYIN!
+)
 
 echo.
 echo Kurulum tamamlandi!
 echo.
 echo Kullanim icin:
 echo   venv\Scripts\activate
-echo   python cli\main.py --input dokuman.pdf
+echo   python app.py
 echo.
 pause

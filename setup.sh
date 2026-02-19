@@ -25,12 +25,19 @@ pip install -r requirements.txt
 
 # Gerekli dizinleri oluştur
 echo "📂 Dizinler oluşturuluyor..."
-mkdir -p data/output data/checkpoints data/logs data/images data/vector_db data/uploads
+mkdir -p data/output data/checkpoints data/logs data/images data/vector_db data/uploads data/database
+
+# .env dosyası kontrolü
+if [ ! -f ".env" ]; then
+    echo "📄 .env dosyası bulunamadı, .env.template kullanılarak oluşturuluyor..."
+    cp .env.template .env
+    echo "⚠️ LÜTFEN .env DOSYASINI KENDİ BİLGİLERİNİZLE GÜNCELLEYİN!"
+fi
 
 echo ""
 echo "✅ Kurulum tamamlandı!"
 echo ""
 echo "Kullanım için:"
 echo "  source venv/bin/activate"
-echo "  python cli/main.py --input dokuman.pdf"
+echo "  python app.py"
 echo ""
