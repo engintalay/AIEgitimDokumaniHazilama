@@ -18,7 +18,8 @@ Ham bilgi kaynaklarından (PDF, DOC, TXT) yapay zeka modeli eğitimi için JSONL
 
 ## Kurulum
 
-### Otomatik Kurulum (Önerilen)
+### 1. Geliştirme/Yerel Kurulum
+Geliştirme ortamı için otomatik kurulum scriptlerini kullanabilirsiniz:
 
 **Linux/Mac:**
 ```bash
@@ -30,85 +31,43 @@ Ham bilgi kaynaklarından (PDF, DOC, TXT) yapay zeka modeli eğitimi için JSONL
 setup.bat
 ```
 
-### Manuel Kurulum
-
+### 2. Canlı (Production) Kurulum
+Uygulamayı sunucuda (Docker olmadan) güvenli ve performanslı çalıştırmak için:
 ```bash
-# Virtual environment oluştur
-python3 -m venv venv
-
-# Aktifleştir (Linux/Mac)
-source venv/bin/activate
-
-# Aktifleştir (Windows)
-venv\Scripts\activate
-
-# Paketleri yükle
-pip install -r requirements.txt
+chmod +x setup_prod.sh
+./setup_prod.sh
 ```
+Bu script **Gunicorn**, **Systemd** ve **Nginx** yapılandırmasını otomatik olarak yapar.
 
 ## Kullanım
 
-### Hızlı Başlangıç
-
+### Hızlı Başlama (Yerel)
 ```bash
-# Kurulum scriptini çalıştır (ilk kez)
-./setup.sh
-
-# Programı çalıştır
-./run.sh --input dokuman.pdf --output dataset.jsonl
-
-# Veya manuel
-source venv/bin/activate
-python cli/main.py --input dokuman.pdf
+# Web arayüzünü (Development) başlat
+./run.sh --web
 ```
+Tarayıcıda: `http://localhost:5000`
 
-### Temel Kullanım
+### Production Kullanımı
+Production kurulumu yapıldıktan sonra uygulama **Nginx** üzerinden **81 portunda** yayında olacaktır.
+Tarayıcıda: `http://localhost:81`
 
-```bash
-python cli/main.py --input dokuman.pdf --output dataset.jsonl
-```
-
-### Config Dosyası ile
-
-```bash
-python cli/main.py --input dokuman.pdf --config config/config.yaml
-```
-
-### Kaldığı Yerden Devam
-
-```bash
-python cli/main.py --input dokuman.pdf --resume
-```
-
-### Checkpoint Temizle
-
-```bash
-python cli/main.py --input dokuman.pdf --clear-checkpoint
-```
-
-### Detaylı Log
-
-```bash
-python cli/main.py --input dokuman.pdf --verbose
-```
+---
 
 ## Vektörel Arama (RAG) ve Web Arayüzü
 
 ### 1. Web Arayüzünü Başlatma
-Modern ve interaktif arayüz üzerinden soru-cevap yapmak için:
+Yerel geliştirme sunucusunu manuel başlatmak için:
 ```bash
 python3 app.py
 ```
-Ardından tarayıcınızda `http://127.0.0.1:5000` adresine gidin.
 
 ### 2. Doküman İndeksleme (Ingestion)
-Dokümanları manuel olarak vektör veri tabanına eklemek için:
 ```bash
 python3 ingest.py --input dokuman.pdf
 ```
 
 ### 3. CLI Üzerinden Soru Sorma (RAG)
-İndekslenmiş dokümanlar arasında akıllı arama yapıp yanıt almak için:
 ```bash
 python3 ask_rag.py "Sorunuzu buraya yazın"
 ```

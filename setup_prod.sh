@@ -44,4 +44,4 @@ sudo nginx -t && sudo systemctl restart nginx
 
 echo "✅ Kurulum tamamlandı!"
 echo "🔍 Uygulama durumu: sudo systemctl status ai_app"
-echo "🌐 Uygulama şu an 80 portunda yayında."
+echo "🌐 Uygulama şu an 81 portunda yayında."
