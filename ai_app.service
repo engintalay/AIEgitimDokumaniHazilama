@@ -1,0 +1,14 @@
+[Unit]
+Description=Gunicorn instance to serve AI Training Document Preparation App
+After=network.target
+
+[Service]
+User=engin
+Group=www-data
+WorkingDirectory=/home/engin/projects/AIEgitimDokumaniHazilama
+Environment="PATH=/home/engin/projects/AIEgitimDokumaniHazilama/venv/bin"
+EnvironmentFile=/home/engin/projects/AIEgitimDokumaniHazilama/.env
+ExecStart=/home/engin/projects/AIEgitimDokumaniHazilama/venv/bin/gunicorn --workers 4 --bind unix:ai_app.sock -m 007 wsgi:app --timeout 120
+
+[Install]
+WantedBy=multi-user.target
