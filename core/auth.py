@@ -7,7 +7,9 @@ import logging
 import os
 
 # Allow insecure transport for local dev (required for HTTP)
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+# Allow insecure transport for local dev (required for HTTP)
+if os.getenv('FLASK_ENV') != 'production':
+    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 oauth = OAuth()
 logger = logging.getLogger("web_app")

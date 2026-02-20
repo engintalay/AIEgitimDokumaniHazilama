@@ -12,9 +12,12 @@
 <body>
     <div class="app-container">
         <header>
-            <div class="logo">
-                <span class="logo-icon">✨</span>
-                <h1>Asistan</h1>
+            <div style="display: flex; align-items: center;">
+                <button id="sidebar-toggle" class="sidebar-toggle">☰</button>
+                <div class="logo">
+                    <span class="logo-icon">✨</span>
+                    <h1>Asistan</h1>
+                </div>
             </div>
             <div class="user-badge">
                 <img src="{{ current_user.picture }}" alt="User" class="avatar">
@@ -22,6 +25,9 @@
                 <a href="{{ url_for('logout') }}" class="icon-btn" title="Çıkış Yap">🚪</a>
             </div>
             <div class="header-actions">
+                {% if current_user.is_admin %}
+                <a href="/admin" class="icon-btn" title="Admin Panel" style="text-decoration: none;">🛡️</a>
+                {% endif %}
                 <div class="status-badge" id="app-status">Sistem Hazır</div>
                 <button id="settings-btn" class="icon-btn" title="Ayarlar">⚙️</button>
             </div>
@@ -172,6 +178,28 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const sidebar = document.querySelector('.sidebar');
+
+        if (sidebarToggle && sidebar) {
+            sidebarToggle.onclick = () => {
+                sidebar.classList.toggle('active');
+                sidebarToggle.textContent = sidebar.classList.contains('active') ? '✕' : '☰';
+            };
+
+            // Mobil menüde bir sohbet seçildiğinde veya dışarı tıklandığında menüyü kapat
+            document.addEventListener('click', (e) => {
+                if (window.innerWidth <= 768 &&
+                    !sidebar.contains(e.target) &&
+                    !sidebarToggle.contains(e.target) &&
+                    sidebar.classList.contains('active')) {
+                    sidebar.classList.remove('active');
+                    sidebarToggle.textContent = '☰';
+                }
+            });
+        }
+    </script>
 </body>
 
 </html>

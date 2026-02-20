@@ -28,6 +28,72 @@
     border-radius: 0.5rem;
 }
 
+/* --- Mobile Responsiveness --- */
+@media (max-width: 768px) {
+    header {
+        padding: 1rem;
+    }
+
+    .logo h1 {
+        display: none;
+    }
+
+    main {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        padding: 1rem;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        display: none;
+        /* JS ile açılıp kapanacak */
+    }
+
+    .sidebar.active {
+        display: flex;
+        position: fixed;
+        top: 60px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 50;
+        background: var(--bg-dark);
+    }
+
+    .chat-section {
+        height: calc(100vh - 60px);
+    }
+
+    .chat-window {
+        padding: 1rem;
+    }
+
+    .message {
+        max-width: 90%;
+    }
+
+    .input-container {
+        margin: 0 1rem 1rem;
+    }
+
+    .sidebar-toggle {
+        display: block !important;
+    }
+}
+
+.sidebar-toggle {
+    display: none;
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    margin-right: 1rem;
+}
+
 .icon-btn:hover {
     background: rgba(255, 255, 255, 0.05);
     color: white;

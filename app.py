@@ -4,6 +4,7 @@ import uuid
 import time
 from dotenv import load_dotenv
 
+from werkzeug.middleware.proxy_fix import ProxyFix
 load_dotenv() # Load environments from .env
 from flask import Flask, render_template, request, jsonify, session, Response, redirect, url_for
 import json
@@ -16,7 +17,8 @@ from core.ai_client_factory import AIClientFactory
 from utils.logger import setup_logger
 from core.models import db, User, Chat, Message
 from core.auth import oauth, init_auth, handle_google_login, handle_google_callback
-from flask_login import LoginManager, login_required, current_user, logout_user
+from flask_login import LoginManager, login_required, current_user, logout_user, login_user
+from functools import wraps
 
 # Load configuration
 def load_config():
@@ -26,6 +28,7 @@ def load_config():
 config = load_config()
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.secret_key = os.getenv('SESSION_SECRET', config.get('model', {}).get('session_secret', str(uuid.uuid4())))
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.abspath('data/database.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -34,6 +37,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 google_auth = config.get('google_auth', {})
 google_auth['client_id'] = os.getenv('GOOGLE_CLIENT_ID', google_auth.get('client_id'))
 google_auth['client_secret'] = os.getenv('GOOGLE_CLIENT_SECRET', google_auth.get('client_secret'))
+google_auth['redirect_uri'] = os.getenv('GOOGLE_REDIRECT_URI', google_auth.get('redirect_uri'))
 app.config['GOOGLE_AUTH'] = google_auth
 
 UPLOAD_FOLDER = os.path.abspath('data/uploads')
@@ -55,6 +59,14 @@ def load_user(user_id):
 
 with app.app_context():
     db.create_all()
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+            return "Bu alan sadece admin yetkisine sahip kullanıcılar içindir.", 403
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Progress tracking
 
@@ -441,6 +453,63 @@ def get_available_models():
         return jsonify({"models": models})
     except Exception as e:
         return jsonify({"models": []})
+
+# --- Admin Routes ---
+
+@app.route('/admin')
+@login_required
+@admin_required
+def admin_dashboard():
+    return render_template('admin/users.html')
+
+@app.route('/admin/users_data')
+@login_required
+@admin_required
+def admin_users_data():
+    users = User.query.all()
+    user_list = []
+    for u in users:
+        chat_count = Chat.query.filter_by(user_id=u.id).count()
+        user_list.append({
+            "id": u.id,
+            "name": u.name,
+            "email": u.email,
+            "picture": u.picture,
+            "chat_count": chat_count,
+            "is_admin": u.is_admin
+        })
+    return jsonify(user_list)
+
+@app.route('/admin/user/<int:user_id>/chats')
+@login_required
+@admin_required
+def admin_view_user_chats(user_id):
+    target_user = User.query.get_or_404(user_id)
+    return render_template('admin/chats.html', target_user=target_user)
+
+@app.route('/admin/user/<int:user_id>/chats_data')
+@login_required
+@admin_required
+def admin_user_chats_data(user_id):
+    chats = Chat.query.filter_by(user_id=user_id).order_by(Chat.updated_at.desc()).all()
+    return jsonify([{
+        "id": c.id,
+        "title": c.title,
+        "updated_at": c.updated_at.isoformat(),
+        "message_count": Message.query.filter_by(chat_id=c.id).count()
+    } for c in chats])
+
+@app.route('/admin/chat/<int:chat_id>/messages')
+@login_required
+@admin_required
+def admin_view_messages(chat_id):
+    messages = Message.query.filter_by(chat_id=chat_id).order_by(Message.timestamp.asc()).all()
+    return jsonify([{
+        "role": m.role,
+        "content": m.content,
+        "timestamp": m.timestamp.isoformat(),
+        "sources": m.get_sources()
+    } for m in messages])
 
 if __name__ == '__main__':
     # Use environment variables for production behavior

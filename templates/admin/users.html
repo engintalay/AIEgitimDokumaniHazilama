@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Kullanıcılar</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        .admin-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .user-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .user-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: transform 0.2s;
+        }
+
+        .user-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent-primary);
+        }
+
+        .user-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .user-info h3 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .user-info p {
+            margin: 0.2rem 0;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .admin-badge {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .view-btn {
+            margin-top: 1rem;
+            display: inline-block;
+            background: var(--accent-primary);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        @media (max-width: 600px) {
+            .user-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .user-card {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="admin-container">
+        <header style="display: flex; justify-content: space-between; align-items: center;">
+            <h1>👥 Kullanıcı Yönetimi</h1>
+            <a href="/" class="view-btn"
+                style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">🏠
+                Uygulamaya Dön</a>
+        </header>
+
+        <div id="user-list" class="user-grid">
+            <!-- JavaScript ile doldurulacak -->
+            <p>Kullanıcılar yükleniyor...</p>
+        </div>
+    </div>
+
+    <script>
+        async function loadUsers() {
+            const response = await fetch('/admin/users_data');
+            const users = await response.json();
+            const container = document.getElementById('user-list');
+            container.innerHTML = '';
+
+            users.forEach(user => {
+                const card = document.createElement('div');
+                card.className = 'user-card';
+                card.innerHTML = `
+                    <img src="${user.picture}" alt="${user.name}" class="user-avatar">
+                    <div class="user-info">
+                        <h3>${user.name} ${user.is_admin ? '<span class="admin-badge">Admin</span>' : ''}</h3>
+                        <p>${user.email}</p>
+                        <p>Total Sohbet: <strong>${user.chat_count}</strong></p>
+                        <a href="/admin/user/${user.id}/chats" class="view-btn">Sohbetleri Gör</a>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        loadUsers();
+    </script>
+</body>
+
+</html>
