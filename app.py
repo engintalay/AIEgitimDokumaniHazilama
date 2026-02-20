@@ -117,13 +117,7 @@ def login():
 
 @app.route('/auth/callback')
 def auth_callback():
-    # Admin email from config or environment for easy changing
-    admin_email = os.getenv('ADMIN_EMAIL', 'engintalay@gmail.com')
-    
     if handle_google_callback():
-        if current_user.email == admin_email:
-            current_user.is_admin = True
-            db.session.commit()
         return redirect(url_for('index'))
     return "Giriş başarısız", 400
 
@@ -131,23 +125,6 @@ def auth_callback():
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('index'))
-
-@app.route('/auth/local_login')
-def local_login():
-    # Only allow if Google credentials are placeholders or if explicitly permitted
-    user = User.query.filter_by(google_id='local_user').first()
-    if not user:
-        user = User(
-            google_id='local_user',
-            email='local@example.com',
-            name='Yerel Kullanıcı',
-            picture='https://ui-avatars.com/api/?name=Local+User',
-            is_admin=True # Local test user is admin by default
-        )
-        db.session.add(user)
-        db.session.commit()
-    login_user(user)
     return redirect(url_for('index'))
 
 @app.route('/upload', methods=['POST'])

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Giriş Yap - AI Doküman Asistanı</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.4">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         .login-container {
@@ -113,13 +113,6 @@
                     class="google-icon">
                 Google ile Giriş Yap
             </a>
-
-            <div style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
-                <a href="{{ url_for('local_login') }}"
-                    style="color: var(--text-muted); text-decoration: none; font-size: 0.85rem;">
-                    🛠️ Yerel Giriş ile Devam Et (Test Modu)
-                </a>
-            </div>
         </div>
     </div>
 </body>

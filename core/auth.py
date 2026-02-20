@@ -71,5 +71,12 @@ def handle_google_callback():
             db.session.commit()
             
         login_user(user)
+        
+        # Admin promotion check
+        admin_email = os.getenv('ADMIN_EMAIL', 'engintalay@gmail.com')
+        if email == admin_email and not user.is_admin:
+            user.is_admin = True
+            db.session.commit()
+            
         return True
     return False

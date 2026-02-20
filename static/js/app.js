@@ -22,6 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeSettings = document.getElementById('close-settings');
     const settingsForm = document.getElementById('settings-form');
     const saveSettingsBtn = document.getElementById('save-settings');
+    const micBtn = document.getElementById('mic-btn');
+    const activeDocIndicator = document.getElementById('active-doc-indicator');
+    const activeDocName = document.getElementById('active-doc-name');
+    const clearSourceBtn = document.getElementById('clear-source-btn');
 
     let selectedSource = null;
     let currentConfig = null;
@@ -30,8 +34,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial load
     updateStats();
     fetchHistory();
+    updateActiveDocUI();
 
     newChatBtn.onclick = startNewChat;
+
+    clearSourceBtn.onclick = () => {
+        selectedSource = null;
+        updateActiveDocUI();
+        updateStats(); // Refresh source list selection
+    };
 
     function startNewChat() {
         currentChatId = null;
@@ -212,6 +223,76 @@ document.addEventListener('DOMContentLoaded', () => {
         fileList.appendChild(item);
     }
 
+    function updateActiveDocUI() {
+        if (selectedSource) {
+            activeDocName.textContent = selectedSource;
+            activeDocIndicator.style.display = 'flex';
+        } else {
+            activeDocIndicator.style.display = 'none';
+        }
+    }
+
+    // Voice Support
+    let recognition = null;
+    let isRecording = false;
+
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'tr-TR';
+
+        recognition.onresult = (event) => {
+            let finalTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                }
+            }
+            if (finalTranscript) {
+                userInput.value += (userInput.value ? ' ' : '') + finalTranscript;
+                userInput.dispatchEvent(new Event('input')); // Trigger auto-resize
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.error('Speech recognition error', event.error);
+            stopRecording();
+        };
+
+        recognition.onend = () => {
+            if (isRecording) recognition.start(); // Keep recording until stopped
+        };
+    }
+
+    micBtn.onclick = () => {
+        if (!recognition) {
+            alert('Tarayıcınız sesli yazma desteği sunmuyor.');
+            return;
+        }
+
+        if (isRecording) {
+            stopRecording();
+        } else {
+            startRecording();
+        }
+    };
+
+    function startRecording() {
+        isRecording = true;
+        micBtn.classList.add('recording');
+        micBtn.textContent = '🛑';
+        recognition.start();
+    }
+
+    function stopRecording() {
+        isRecording = false;
+        micBtn.classList.remove('recording');
+        micBtn.textContent = '🎤';
+        recognition.stop();
+    }
+
     // Handle Chat
     sendBtn.addEventListener('click', sendMessage);
     userInput.addEventListener('keypress', (e) => {
@@ -306,12 +387,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (selectedSource === source.name) {
                     selectedSource = null;
-                    div.classList.remove('selected');
                 } else {
-                    document.querySelectorAll('.source-item').forEach(i => i.classList.remove('selected'));
                     selectedSource = source.name;
-                    div.classList.add('selected');
                 }
+                updateActiveDocUI();
+                renderSourceList(data.sources); // Re-render to show selection
             };
 
             dbSources.appendChild(div);
