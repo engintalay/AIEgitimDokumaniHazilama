@@ -28,7 +28,10 @@ class Message(db.Model):
     chat_id = db.Column(db.Integer, db.ForeignKey('chat.id'), nullable=False)
     role = db.Column(db.String(20), nullable=False) # 'user' or 'bot'
     content = db.Column(db.Text, nullable=False)
-    sources = db.Column(db.Text) # Stored as JSON string
+    sources = db.Column(db.Text) # JSON list
+    response_time = db.Column(db.Float) # In seconds
+    prompt_tokens = db.Column(db.Integer)
+    completion_tokens = db.Column(db.Integer)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_sources(self, sources_list):
@@ -36,3 +39,15 @@ class Message(db.Model):
 
     def get_sources(self):
         return json.loads(self.sources) if self.sources else []
+
+class Report(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    message_id = db.Column(db.Integer, db.ForeignKey('message.id'), nullable=True)
+    content = db.Column(db.Text, nullable=False)
+    image_path = db.Column(db.String(255), nullable=True)
+    status = db.Column(db.String(20), default="pending") # pending, resolved, ignored
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user_rel = db.relationship('User', backref='reports')
+    message_rel = db.relationship('Message', backref='reports')

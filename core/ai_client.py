@@ -21,8 +21,10 @@ class AIClient(ABC):
         self.json_wrapper = config.get('json_wrapper', '')
     
     @abstractmethod
-    def generate(self, prompt: str, options: Dict[str, Any] = None) -> str:
-        """Generate response from AI model with optional parameter overrides."""
+    def generate(self, prompt: str, options: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Generate response from AI model with optional parameter overrides.
+        Returns: {"text": str, "usage": {"prompt_tokens": int, "completion_tokens": int}}
+        """
         pass
     
     @abstractmethod

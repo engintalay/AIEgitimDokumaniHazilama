@@ -531,28 +531,43 @@ main {
     right: 0.75rem;
     display: flex;
     gap: 0.5rem;
-    opacity: 0.6;
+    opacity: 0.7;
     transition: opacity 0.2s;
 }
 
-.message:hover .message-actions {
+.bot-message:hover .message-actions,
+.bot-message .message-actions {
+    opacity: 1;
+    /* Always visible on bot messages for discoverability */
+}
+
+.user-message:hover .message-actions {
     opacity: 1;
 }
 
 .action-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     color: white;
     cursor: pointer;
-    font-size: 0.85rem;
-    padding: 0.2rem 0.4rem;
-    border-radius: 0.4rem;
+    font-size: 0.9rem;
+    /* Slightly larger */
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.5rem;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
 }
 
 .action-btn:hover {
     background: rgba(255, 255, 255, 0.2);
     transform: scale(1.1);
+}
+
+.report-btn:hover {
+    background: rgba(239, 68, 68, 0.2) !important;
+    color: #ef4444 !important;
 }
 
 .sources {
@@ -563,9 +578,130 @@ main {
     padding-top: 0.5rem;
 }
 
-.upload-section {
-    padding: 1.5rem;
-    border-top: 1px solid var(--border-color);
+.message-stats {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    opacity: 0.8;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--bg-card);
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    /* Don't exceed screen height */
+    padding: 2rem;
+    border-radius: 1.5rem;
+    border: 1px solid var(--border-color);
+    position: relative;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    display: flex;
+    /* Flex layout for header/body/footer */
+    flex-direction: column;
+}
+
+.modal-body {
+    overflow-y: auto;
+    padding-right: 0.5rem;
+    margin-right: -0.5rem;
+}
+
+/* Custom Scrollbar for Modal Body */
+.modal-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.modal-header h2 {
+    margin: 0 0 1.5rem;
+    font-size: 1.5rem;
+}
+
+.report-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.report-form textarea {
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 1rem;
+    border-radius: 0.75rem;
+    resize: none;
+    min-height: 100px;
+    font-family: inherit;
+}
+
+.report-form input[type="file"] {
+    display: none;
+}
+
+.file-label {
+    background: var(--bg-main);
+    border: 1px dashed var(--border-color);
+    padding: 1rem;
+    border-radius: 0.75rem;
+    cursor: pointer;
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    transition: all 0.2s;
+}
+
+.file-label:hover {
+    border-color: var(--accent-primary);
+    color: var(--text-main);
+}
+
+#report-img-preview {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 0.5rem;
+    display: none;
+    margin-top: 0.5rem;
+    object-fit: contain;
 }
 
 .sidebar-top {
@@ -587,10 +723,37 @@ main {
     margin-top: 1rem;
 }
 
-.history-list {
+.inline-refresh-btn {
+    background: transparent;
+    border: none;
+    color: var(--accent-primary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.4rem;
+    transition: all 0.2s;
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 0.25rem;
+}
+
+.inline-refresh-btn:hover {
+    background: rgba(var(--accent-rgb), 0.1);
+    transform: translateY(-1px);
+}
+
+.inline-refresh-btn.spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .history-item {

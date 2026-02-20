@@ -5,8 +5,11 @@ import time
 from dotenv import load_dotenv
 
 from werkzeug.middleware.proxy_fix import ProxyFix
-load_dotenv() # Load environments from .env
-from flask import Flask, render_template, request, jsonify, session, Response, redirect, url_for
+load_dotenv() # Limport logging
+import logging
+import time
+from datetime import datetime
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory
 import json
 from werkzeug.utils import secure_filename
 from core.document_parser import DocumentParser
@@ -15,7 +18,7 @@ from core.embedding_client import EmbeddingClient
 from core.vector_db import VectorDB
 from core.ai_client_factory import AIClientFactory
 from utils.logger import setup_logger
-from core.models import db, User, Chat, Message
+from core.models import db, User, Chat, Message, Report
 from core.auth import oauth, init_auth, handle_google_login, handle_google_callback
 from flask_login import LoginManager, login_required, current_user, logout_user, login_user
 from functools import wraps
@@ -40,10 +43,11 @@ google_auth['client_secret'] = os.getenv('GOOGLE_CLIENT_SECRET', google_auth.get
 google_auth['redirect_uri'] = os.getenv('GOOGLE_REDIRECT_URI', google_auth.get('redirect_uri'))
 app.config['GOOGLE_AUTH'] = google_auth
 
-UPLOAD_FOLDER = os.path.abspath('data/uploads')
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(os.path.abspath('data'), exist_ok=True)
+# Ensure upload and data directories exist
+os.makedirs('data/uploads', exist_ok=True)
+os.makedirs('data/reports', exist_ok=True)
+app.config['UPLOAD_FOLDER'] = 'data/uploads'
+app.config['REPORT_FOLDER'] = 'data/reports'
 
 # Initialize extensions
 db.init_app(app)
@@ -255,12 +259,22 @@ def ask_question():
         model_overrides = user_settings.get('model', {})
         
         # We pass model options to support per-user settings
-        answer = ai_client.generate(prompt, options=model_overrides) 
-        # Note: To fully support independent models per user, AIClient would need to be re-created per request or accept overrides.
-        # For now, we'll focus on context and standard generation.
+        start_time = time.time()
+        result_data = ai_client.generate(prompt, options=model_overrides) 
+        generation_time = time.time() - start_time
+        
+        answer = result_data['text']
+        usage = result_data.get('usage', {})
         
         # Save bot message
-        bot_msg = Message(chat_id=active_chat.id, role='bot', content=answer)
+        bot_msg = Message(
+            chat_id=active_chat.id, 
+            role='bot', 
+            content=answer,
+            response_time=generation_time,
+            prompt_tokens=usage.get('prompt_tokens', 0),
+            completion_tokens=usage.get('completion_tokens', 0)
+        )
         sources_list = list(set(m['source'] for m in metadatas)) if contexts else []
         bot_msg.set_sources(sources_list)
         db.session.add(bot_msg)
@@ -270,7 +284,13 @@ def ask_question():
             "answer": answer,
             "sources": sources_list,
             "chat_id": active_chat.id,
-            "chat_title": active_chat.title
+            "chat_title": active_chat.title,
+            "message_id": bot_msg.id,
+            "stats": {
+                "time": round(generation_time, 2),
+                "prompt_tokens": usage.get('prompt_tokens', 0),
+                "completion_tokens": usage.get('completion_tokens', 0)
+            }
         })
         
     except Exception as e:
@@ -308,7 +328,13 @@ def chat_detail(chat_id):
                 "role": m.role,
                 "content": m.content,
                 "sources": m.get_sources(),
-                "timestamp": m.timestamp.isoformat()
+                "timestamp": m.timestamp.isoformat(),
+                "id": m.id,
+                "stats": {
+                    "time": round(m.response_time, 2) if m.response_time else None,
+                    "prompt_tokens": m.prompt_tokens,
+                    "completion_tokens": m.completion_tokens
+                } if m.role == 'bot' else None
             } for m in messages]
         })
     else:
@@ -316,12 +342,26 @@ def chat_detail(chat_id):
         db.session.commit()
         return jsonify({"message": "Sohbet silindi"})
 
-@app.route('/stats', methods=['GET'])
+@app.route('/stats')
 @login_required
 def get_stats():
     try:
+        is_admin = getattr(current_user, 'is_admin', False)
+        # Check if requesting stats for a specific user (admin only)
+        target_user_id = request.args.get('user_id', type=int)
+        
+        if target_user_id and is_admin:
+            query_user_id = target_user_id
+        else:
+            query_user_id = current_user.id
+            
         count = vector_db.get_collection_count()
-        sources = vector_db.get_unique_sources(user_id=current_user.id)
+        sources = vector_db.get_unique_sources(user_id=query_user_id, is_admin=is_admin and not target_user_id)
+        
+        # If target_user_id is set, filter to only their sources
+        if target_user_id and is_admin:
+            sources = [s for s in sources if s.get('user_id') == target_user_id]
+
         return jsonify({
             "count": count,
             "sources": sources,
@@ -355,8 +395,9 @@ def delete_source():
         return jsonify({"error": "Kaynak belirtilmedi"}), 400
     
     try:
-        logger.info(f"🗑️ Kaynak siliniyor: {source} (User: {current_user.id})")
-        vector_db.delete_by_source(source, user_id=current_user.id)
+        is_admin = getattr(current_user, 'is_admin', False)
+        logger.info(f"🗑️ Kaynak siliniyor: {source} (User: {current_user.id}, Admin: {is_admin})")
+        vector_db.delete_by_source(source, user_id=current_user.id, is_admin=is_admin)
         return jsonify({"message": f"'{source}' başarıyla silindi."})
     except Exception as e:
         logger.error(f"Silme hatası: {str(e)}")
@@ -387,7 +428,8 @@ def toggle_public():
         return jsonify({"error": "Kaynak belirtilmedi"}), 400
         
     try:
-        success = vector_db.update_visibility(source, current_user.id, is_public)
+        is_admin = getattr(current_user, 'is_admin', False)
+        success = vector_db.update_visibility(source, current_user.id, is_public, is_admin=is_admin)
         if success:
             status = "artık genel" if is_public else "artık özel"
             return jsonify({"message": f"'{source}' {status}."})
@@ -485,8 +527,100 @@ def admin_view_messages(chat_id):
         "role": m.role,
         "content": m.content,
         "timestamp": m.timestamp.isoformat(),
-        "sources": m.get_sources()
+        "sources": m.get_sources(),
+        "stats": {
+            "time": round(m.response_time, 2) if m.response_time else None,
+            "prompt_tokens": m.prompt_tokens,
+            "completion_tokens": m.completion_tokens
+        } if m.role == 'bot' else None
     } for m in messages])
+
+@app.route('/admin/user/<int:user_id>/sources')
+@login_required
+@admin_required
+def admin_view_user_sources(user_id):
+    target_user = User.query.get_or_404(user_id)
+    return render_template('admin/sources.html', target_user=target_user)
+
+@app.route('/report', methods=['POST'])
+@login_required
+def submit_report():
+    content = request.form.get('content')
+    message_id = request.form.get('message_id')
+    image = request.files.get('image')
+    
+    if not content:
+        return jsonify({"error": "Rapor içeriği boş olamaz"}), 400
+        
+    try:
+        report = Report(
+            user_id=current_user.id,
+            message_id=message_id,
+            content=content
+        )
+        
+        if image:
+            filename = f"report_{current_user.id}_{int(time.time())}.{image.filename.split('.')[-1]}"
+            img_path = os.path.join(app.config['REPORT_FOLDER'], filename)
+            image.save(img_path)
+            report.image_path = filename
+
+        db.session.add(report)
+        db.session.commit()
+        return jsonify({"message": "Raporunuz başarıyla iletildi. Teşekkür ederiz!"})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Report error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/admin/reports/image/<filename>')
+@login_required
+@admin_required
+def get_report_image(filename):
+    return send_from_directory(app.config['REPORT_FOLDER'], filename)
+
+@app.route('/admin/reports')
+@login_required
+@admin_required
+def admin_reports():
+    return render_template('admin/reports.html')
+
+@app.route('/admin/reports_data')
+@login_required
+@admin_required
+def admin_reports_data():
+    reports = Report.query.order_by(Report.timestamp.desc()).all()
+    return jsonify([{
+        "id": r.id,
+        "user_name": r.user_rel.name,
+        "user_email": r.user_rel.email,
+        "content": r.content,
+        "image_path": r.image_path,
+        "status": r.status,
+        "timestamp": r.timestamp.isoformat(),
+        "message_id": r.message_id
+    } for r in reports])
+
+@app.route('/admin/reports/<int:report_id>/resolve', methods=['POST'])
+@login_required
+@admin_required
+def admin_resolve_report(report_id):
+    report = Report.query.get_or_404(report_id)
+    report.status = "resolved"
+    db.session.commit()
+    return jsonify({"message": "Rapor çözüldü olarak işaretlendi."})
+
+@app.route('/admin/users/<int:user_id>/toggle_admin', methods=['POST'])
+@login_required
+@admin_required
+def admin_toggle_role(user_id):
+    if user_id == current_user.id:
+        return jsonify({"error": "Kendi yetkinizi değiştiremezsiniz."}), 400
+        
+    user = User.query.get_or_404(user_id)
+    user.is_admin = not user.is_admin
+    db.session.commit()
+    return jsonify({"message": f"Kullanıcı artık {'Admin' if user.is_admin else 'Standart'} yetkisine sahip."})
 
 if __name__ == '__main__':
     # Use environment variables for production behavior

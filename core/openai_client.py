@@ -11,13 +11,27 @@ class OpenAIClient(AIClient):
         super().__init__(config)
         self.api_key = config.get('api_key', '')
     
-    def generate(self, prompt: str, options: Dict[str, Any] = None) -> str:
+    def generate(self, prompt: str, options: Dict[str, Any] = None) -> Dict[str, Any]:
         """Generate response from OpenAI with optional parameter overrides."""
-        url = "https://api.openai.com/v1/chat/completions"
+        options = options or {}
         
-        # Merge options into defaults
-        temp = float(options.get('temperature', self.temperature)) if options and 'temperature' in options else self.temperature
-        tokens = int(options.get('max_tokens', self.max_tokens)) if options and 'max_tokens' in options else self.max_tokens
+        # Merge options into defaults with safety checks
+        endpoint = options.get('endpoint', self.endpoint) or "https://api.openai.com"
+        url = f"{endpoint}/v1/chat/completions"
+        
+        model = options.get('name', self.model_name) or self.model_name
+        
+        try:
+            temp_val = options.get('temperature', self.temperature)
+            temp = float(temp_val) if temp_val not in (None, '') else self.temperature
+        except (ValueError, TypeError):
+            temp = self.temperature
+
+        try:
+            tokens_val = options.get('max_tokens', self.max_tokens)
+            tokens = int(tokens_val) if tokens_val not in (None, '') else self.max_tokens
+        except (ValueError, TypeError):
+            tokens = self.max_tokens
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -25,7 +39,7 @@ class OpenAIClient(AIClient):
         }
         
         payload = {
-            "model": self.model_name,
+            "model": model,
             "messages": [
                 {"role": "user", "content": prompt}
             ],
@@ -41,7 +55,16 @@ class OpenAIClient(AIClient):
                 timeout=self.timeout
             )
             response.raise_for_status()
-            return response.json()['choices'][0]['message']['content']
+            data = response.json()
+            usage_data = data.get('usage', {})
+            usage = {
+                "prompt_tokens": usage_data.get('prompt_tokens', 0),
+                "completion_tokens": usage_data.get('completion_tokens', 0)
+            }
+            return {
+                "text": data['choices'][0]['message']['content'],
+                "usage": usage
+            }
         except Exception as e:
             raise RuntimeError(f"OpenAI generation failed: {str(e)}")
     

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Hata Raporları</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        .admin-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .report-list {
+            margin-top: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .report-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .report-user {
+            font-weight: 600;
+            color: var(--accent-primary);
+        }
+
+        .report-date {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .report-content {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+        }
+
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-pending {
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+        }
+
+        .status-resolved {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+        }
+
+        .btn-resolve {
+            align-self: flex-end;
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="admin-container">
+        <header
+            style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 1rem;">
+            <h1>🚩 Kullanıcı Hata Raporları</h1>
+            <nav style="display: flex; gap: 1rem;">
+                <a href="/admin" class="view-btn"
+                    style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">👥
+                    Kullanıcılar</a>
+                <a href="/" class="view-btn"
+                    style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">🏠
+                    Uygulamaya Dön</a>
+            </nav>
+        </header>
+
+        <div id="report-list" class="report-list">
+            <p>Raporlar yükleniyor...</p>
+        </div>
+    </div>
+
+    <script>
+        async function loadReports() {
+            const response = await fetch('/admin/reports_data');
+            const reports = await response.json();
+            const container = document.getElementById('report-list');
+            container.innerHTML = '';
+
+            if (reports.length === 0) {
+                container.innerHTML = '<p>Henüz raporlanmış bir hata yok.</p>';
+                return;
+            }
+
+            reports.forEach(r => {
+                const date = new Date(r.timestamp).toLocaleString('tr-TR');
+                const card = document.createElement('div');
+                card.className = 'report-card';
+                card.innerHTML = `
+                    <div class="report-header">
+                        <div>
+                            <span class="report-user">${r.user_name}</span> 
+                            <span style="font-size: 0.8rem; color: var(--text-muted);">(${r.user_email})</span>
+                        </div>
+                        <span class="status-badge status-${r.status}">${r.status === 'resolved' ? 'Çözüldü' : 'Bekliyor'}</span>
+                    </div>
+                    <div class="report-date">${date}</div>
+                    <div class="report-content">${r.content}</div>
+                    ${r.image_path ? `
+                        <div style="margin-top: 1rem;">
+                            <a href="/admin/reports/image/${r.image_path}" target="_blank">
+                                <img src="/admin/reports/image/${r.image_path}" style="max-width: 100%; border-radius: 0.5rem; cursor: pointer; border: 1px solid var(--border-color);">
+                            </a>
+                        </div>
+                    ` : ''}
+                    ${r.status === 'pending' ? `<button onclick="resolveReport(${r.id})" class="btn-resolve">Çözüldü İşaretle</button>` : ''}
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function resolveReport(id) {
+            try {
+                const response = await fetch(`/admin/reports/${id}/resolve`, { method: 'POST' });
+                const data = await response.json();
+                loadReports();
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        loadReports();
+    </script>
+</body>
+
+</html>

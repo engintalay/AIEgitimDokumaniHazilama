@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Kullanıcı Dosyaları</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        .admin-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .source-grid {
+            margin-top: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1rem;
+        }
+
+        .source-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .source-info h3 {
+            margin: 0;
+            font-size: 1rem;
+            color: var(--text-main);
+        }
+
+        .source-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .source-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .action-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.4rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--accent-primary);
+        }
+
+        .btn-delete:hover {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        .shared-badge {
+            color: #10b981;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="admin-container">
+        <header
+            style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 1rem;">
+            <div>
+                <h1>📂 {{ target_user.name }} - Dosyalar</h1>
+                <p style="color: var(--text-muted); font-size: 0.9rem;">{{ target_user.email }}</p>
+            </div>
+            <nav style="display: flex; gap: 1rem;">
+                <a href="/admin" class="view-btn"
+                    style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">👥
+                    Kullanıcılar</a>
+                <a href="/" class="view-btn"
+                    style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">🏠
+                    Uygulamaya Dön</a>
+            </nav>
+        </header>
+
+        <div id="source-list" class="source-grid">
+            <p>Dosyalar yükleniyor...</p>
+        </div>
+    </div>
+
+    <script>
+        const targetUserId = {{ target_user.id }};
+
+        async function loadSources() {
+            const response = await fetch(`/stats?user_id=${targetUserId}`);
+            const data = await response.json();
+            const container = document.getElementById('source-list');
+            container.innerHTML = '';
+
+            if (!data.sources || data.sources.length === 0) {
+                container.innerHTML = '<p>Bu kullanıcı henüz dosya yüklememiş.</p>';
+                return;
+            }
+
+            data.sources.forEach(s => {
+                const card = document.createElement('div');
+                card.className = 'source-card';
+                card.innerHTML = `
+                    <div class="source-info">
+                        <h3>${s.name}</h3>
+                        <div class="source-meta">
+                            ${s.is_public ? '<span class="shared-badge">🌐 Herkese Açık</span>' : '🔒 Özel'}
+                        </div>
+                    </div>
+                    <div class="source-actions">
+                        <button onclick="toggleVisibility('${s.name}', ${s.is_public})" class="action-btn" title="Görünürlüğü Değiştir">
+                            ${s.is_public ? 'Özel Yap' : 'Genel Yap'}
+                        </button>
+                        <button onclick="deleteSource('${s.name}')" class="action-btn btn-delete" title="Sil">🗑️</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function toggleVisibility(source, currentPublic) {
+            try {
+                const response = await fetch('/toggle_public', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source, is_public: !currentPublic })
+                });
+                const data = await response.json();
+                if (data.error) alert(data.error);
+                loadSources();
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function deleteSource(source) {
+            if (!confirm(`'${source}' dosyasını ve tüm verilerini silmek istediğinize emin misiniz?`)) return;
+            try {
+                const response = await fetch('/delete_source', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source })
+                });
+                const data = await response.json();
+                if (data.error) alert(data.error);
+                loadSources();
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        loadSources();
+    </script>
+</body>
+
+</html>

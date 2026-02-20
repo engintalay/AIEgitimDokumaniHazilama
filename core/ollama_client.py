@@ -16,24 +16,36 @@ class OllamaClient(AIClient):
         self.session = requests.Session()
         self.session.trust_env = False  # Proxy ayarlarını yoksay
     
-    def generate(self, prompt: str, options: Dict[str, Any] = None) -> str:
+    def generate(self, prompt: str, options: Dict[str, Any] = None) -> Dict[str, Any]:
         """Generate response from Ollama with optional parameter overrides."""
-        url = f"{self.endpoint}/api/generate"
+        options = options or {}
         
         # Merge options into defaults
-        opts = {
-            "temperature": self.temperature,
-            "num_predict": self.max_tokens
-        }
-        if options:
-            if 'temperature' in options: opts['temperature'] = float(options['temperature'])
-            if 'max_tokens' in options: opts['num_predict'] = int(options['max_tokens'])
+        endpoint = options.get('endpoint', self.endpoint) or self.endpoint
+        url = f"{endpoint}/api/generate"
+        
+        model = options.get('name', self.model_name) or self.model_name
+        
+        try:
+            temp_val = options.get('temperature', self.temperature)
+            temp = float(temp_val) if temp_val not in (None, '') else self.temperature
+        except (ValueError, TypeError):
+            temp = self.temperature
+
+        try:
+            tokens_val = options.get('max_tokens', self.max_tokens)
+            tokens = int(tokens_val) if tokens_val not in (None, '') else self.max_tokens
+        except (ValueError, TypeError):
+            tokens = self.max_tokens
 
         payload = {
-            "model": self.model_name,
+            "model": model,
             "prompt": prompt,
             "stream": False,
-            "options": opts
+            "options": {
+                "temperature": temp,
+                "num_predict": tokens
+            }
         }
         
         # Log request
@@ -50,14 +62,22 @@ class OllamaClient(AIClient):
                 timeout=self.timeout
             )
             response.raise_for_status()
-            result = response.json().get('response', '')
+            data = response.json()
+            result = data.get('response', '')
+            
+            # Extract usage
+            usage = {
+                "prompt_tokens": data.get('prompt_eval_count', 0),
+                "completion_tokens": data.get('eval_count', 0)
+            }
             
             # Log response
             logger.debug(f"=== OLLAMA RESPONSE ===")
+            logger.debug(f"Usage: {usage}")
             logger.debug(f"Response:\n{result[:500]}..." if len(result) > 500 else f"Response:\n{result}")
             logger.debug(f"======================\n")
             
-            return result
+            return {"text": result, "usage": usage}
         except Exception as e:
             logger.error(f"Ollama generation failed: {str(e)}")
             raise RuntimeError(f"Ollama generation failed: {str(e)}")

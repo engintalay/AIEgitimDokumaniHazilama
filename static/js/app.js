@@ -19,6 +19,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const sidebar = document.querySelector('.sidebar');
     const settingsBtn = document.getElementById('settings-btn');
     const settingsModal = document.getElementById('settings-modal');
+    const reportModal = document.getElementById('report-modal');
+    const reportForm = document.getElementById('report-form');
+    const reportImage = document.getElementById('report-image');
+    const reportImgPreview = document.getElementById('report-img-preview');
+    const reportFileLabel = document.getElementById('report-file-label');
     const closeSettings = document.getElementById('close-settings');
     const settingsForm = document.getElementById('settings-form');
     const saveSettingsBtn = document.getElementById('save-settings');
@@ -104,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             chatWindow.innerHTML = '';
             data.messages.forEach(msg => {
-                addMessage(msg.role, msg.content, false, msg.sources);
+                addMessage(msg.role, msg.content, false, msg.sources, msg.id);
             });
 
             fetchHistory(); // Refresh to update active state
@@ -258,6 +263,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         recognition.onerror = (event) => {
             console.error('Speech recognition error', event.error);
+            const errors = {
+                'not-allowed': 'Mikrofon izni reddedildi. Lütfen tarayıcı ayarlarından mikrofon erişimine izin verin.',
+                'network': 'Ağ hatası. Sesli yazma için internet bağlantısı gerekiyor.',
+                'no-speech': 'Ses algılanamadı. Lütfen tekrar deneyin.',
+                'aborted': 'İşlem iptal edildi.'
+            };
+            alert('❌ Mikrofon Hatası: ' + (errors[event.error] || event.error));
             stopRecording();
         };
 
@@ -272,10 +284,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (!window.isSecureContext && location.hostname !== 'localhost') {
+            alert('❌ Güvenlik Hatası: Sesli yazma özelliği sadece güvenli bağlantılarda (HTTPS) çalışabilir. Lütfen HTTPS üzerinden bağlandığınızdan emin olun.');
+            return;
+        }
+
         if (isRecording) {
             stopRecording();
         } else {
-            startRecording();
+            try {
+                startRecording();
+            } catch (err) {
+                console.error('Recognition start failed:', err);
+                alert('Mikrofon başlatılamadı. Lütfen izinlerinizi kontrol edin.');
+                stopRecording();
+            }
         }
     };
 
@@ -336,7 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.error) {
                 addMessage('bot', `❌ Hata: ${data.error}`);
             } else {
-                addMessage('bot', data.answer, false, data.sources);
+                addMessage('bot', data.answer, false, data.sources, data.message_id, data.stats);
                 if (!currentChatId && data.chat_id) {
                     currentChatId = data.chat_id;
                     fetchHistory();
@@ -482,7 +505,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    function addMessage(role, text, isLoading = false, sources = []) {
+    function addMessage(role, text, isLoading = false, sources = [], messageId = null, stats = null) {
         const div = document.createElement('div');
         div.className = `message ${role}-message`;
 
@@ -494,9 +517,31 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button class="action-btn rerun-btn" title="Tekrar Çalıştır">🔄</button>
                 </div>
             `;
+        } else if (role === 'bot' && !isLoading) {
+            actionHtml = `
+                <div class="message-actions">
+                    <button class="action-btn report-btn" title="Hata Bildir">🚩</button>
+                    <button class="action-btn copy-btn" title="Metni Kopyala">📋</button>
+                </div>
+            `;
         }
 
-        let html = `<div class="message-content">${text.replace(/\n/g, '<br>')}</div>${actionHtml}`;
+        let statsHtml = '';
+        if (role === 'bot' && !isLoading && stats) {
+            statsHtml = `
+                <div class="message-stats">
+                    <span class="stat-item" title="Cevap Süresi">⏱️ ${stats.time}s</span>
+                    <span class="stat-item" title="Prompt Token">📥 ${stats.prompt_tokens}</span>
+                    <span class="stat-item" title="Cevap Token">📤 ${stats.completion_tokens}</span>
+                </div>
+            `;
+        }
+
+        let html = `
+            <div class="message-content">${text.replace(/\n/g, '<br>')}</div>
+            ${statsHtml}
+            ${actionHtml}
+        `;
 
         if (sources && sources.length > 0) {
             html += `<div class="sources">Kaynaklar: ${sources.join(', ')}</div>`;
@@ -507,21 +552,85 @@ document.addEventListener('DOMContentLoaded', () => {
         chatWindow.scrollTop = chatWindow.scrollHeight;
 
         // Add action listeners
-        if (role === 'user' && !isLoading) {
-            const cleanText = text.includes(' (Dosya:') ? text.split(' (Dosya:')[0] : text;
-            div.querySelector('.copy-btn').onclick = () => {
-                userInput.value = cleanText;
-                userInput.focus();
-                userInput.dispatchEvent(new Event('input')); // Trigger auto-resize
-            };
-            div.querySelector('.rerun-btn').onclick = () => {
-                userInput.value = cleanText;
-                sendMessage();
-            };
+        if (!isLoading) {
+            if (role === 'user') {
+                const cleanText = text.includes(' (Dosya:') ? text.split(' (Dosya:')[0] : text;
+                div.querySelector('.copy-btn').onclick = () => {
+                    userInput.value = cleanText;
+                    userInput.focus();
+                    userInput.dispatchEvent(new Event('input')); // Trigger auto-resize
+                };
+                div.querySelector('.rerun-btn').onclick = () => {
+                    userInput.value = cleanText;
+                    sendMessage();
+                };
+            } else if (role === 'bot') {
+                div.querySelector('.copy-btn').onclick = () => {
+                    navigator.clipboard.writeText(text);
+                    const originalText = div.querySelector('.copy-btn').textContent;
+                    div.querySelector('.copy-btn').textContent = '✅';
+                    setTimeout(() => div.querySelector('.copy-btn').textContent = originalText, 1000);
+                };
+                div.querySelector('.report-btn').onclick = () => {
+                    openReportModal(messageId);
+                };
+            }
         }
 
         return div;
     }
+
+    // Reporting Logic
+    window.openReportModal = (messageId) => {
+        document.getElementById('report-message-id').value = messageId || '';
+        document.getElementById('report-content').value = '';
+        reportImage.value = '';
+        reportImgPreview.style.display = 'none';
+        reportFileLabel.querySelector('span').textContent = '📸 Görsel Ekle (Opsiyonel)';
+        reportModal.classList.add('active');
+    };
+
+    window.closeReportModal = () => {
+        reportModal.classList.remove('active');
+    };
+
+    reportImage.onchange = () => {
+        const file = reportImage.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                reportImgPreview.src = e.target.result;
+                reportImgPreview.style.display = 'block';
+                reportFileLabel.querySelector('span').textContent = 'Görsel Seçildi: ' + file.name;
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    reportForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const formData = new FormData();
+        formData.append('content', document.getElementById('report-content').value);
+        formData.append('message_id', document.getElementById('report-message-id').value);
+        if (reportImage.files[0]) {
+            formData.append('image', reportImage.files[0]);
+        }
+
+        try {
+            const response = await fetch('/report', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            if (data.message) {
+                alert(data.message);
+                closeReportModal();
+            } else alert('Hata: ' + data.error);
+        } catch (err) {
+            console.error('Report submission failed:', err);
+            alert('Rapor gönderilemedi.');
+        }
+    };
 
     function removeMessage(el) {
         el.remove();
@@ -536,6 +645,20 @@ document.addEventListener('DOMContentLoaded', () => {
     closeSettings.onclick = () => {
         settingsModal.classList.remove('active');
     };
+
+    const refreshModelsBtn = document.getElementById('refresh-models-btn');
+    if (refreshModelsBtn) {
+        refreshModelsBtn.onclick = async () => {
+            const originalText = refreshModelsBtn.innerHTML;
+            refreshModelsBtn.innerHTML = '⌛ Yenileniyor...';
+            refreshModelsBtn.disabled = true;
+
+            await updateAvailableModels(configModelName.value);
+
+            refreshModelsBtn.innerHTML = originalText;
+            refreshModelsBtn.disabled = false;
+        };
+    }
 
     window.onclick = (e) => {
         if (e.target === settingsModal) settingsModal.classList.remove('active');

@@ -91,11 +91,17 @@
 
 <body>
     <div class="admin-container">
-        <header style="display: flex; justify-content: space-between; align-items: center;">
+        <header
+            style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 1rem;">
             <h1>👥 Kullanıcı Yönetimi</h1>
-            <a href="/" class="view-btn"
-                style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">🏠
-                Uygulamaya Dön</a>
+            <nav style="display: flex; gap: 1rem;">
+                <a href="/admin/reports" class="view-btn"
+                    style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">🚩
+                    Hata Raporları</a>
+                <a href="/" class="view-btn"
+                    style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">🏠
+                    Uygulamaya Dön</a>
+            </nav>
         </header>
 
         <div id="user-list" class="user-grid">
@@ -120,11 +126,30 @@
                         <h3>${user.name} ${user.is_admin ? '<span class="admin-badge">Admin</span>' : ''}</h3>
                         <p>${user.email}</p>
                         <p>Total Sohbet: <strong>${user.chat_count}</strong></p>
-                        <a href="/admin/user/${user.id}/chats" class="view-btn">Sohbetleri Gör</a>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <a href="/admin/user/${user.id}/chats" class="view-btn">Sohbetler</a>
+                            <a href="/admin/user/${user.id}/sources" class="view-btn" style="background: #10b981;">Dosyalar</a>
+                            <button onclick="toggleAdmin(${user.id})" class="view-btn" style="background: #6366f1;">
+                                ${user.is_admin ? 'Yetki Al' : 'Admin Yap'}
+                            </button>
+                        </div>
                     </div>
                 `;
                 container.appendChild(card);
             });
+        }
+
+        async function toggleAdmin(userId) {
+            if (!confirm('Kullanıcı yetkisini değiştirmek istediğinize emin misiniz?')) return;
+            try {
+                const response = await fetch(`/admin/users/${userId}/toggle_admin`, { method: 'POST' });
+                const data = await response.json();
+                alert(data.message || data.error);
+                loadUsers();
+            } catch (err) {
+                console.error(err);
+                alert('İşlem başarısız.');
+            }
         }
 
         loadUsers();

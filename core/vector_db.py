@@ -56,10 +56,10 @@ class VectorDB:
         """Return total document count in collection."""
         return self.collection.count()
 
-    def get_unique_sources(self, user_id: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Return list of unique source filenames with their metadata (owner, shared status)."""
+    def get_unique_sources(self, user_id: Optional[int] = None, is_admin: bool = False) -> List[Dict[str, Any]]:
+        """Return list of unique source filenames. Admins see all."""
         where = None
-        if user_id is not None:
+        if not is_admin and user_id is not None:
              where = {"$or": [
                 {"user_id": user_id},
                 {"is_public": True}
@@ -76,26 +76,32 @@ class VectorDB:
                             "name": src,
                             "user_id": m.get('user_id'),
                             "is_public": m.get('is_public', False),
-                            "is_owner": m.get('user_id') == user_id
+                            "is_owner": m.get('user_id') == user_id if user_id else False
                         }
         return sorted(list(sources_map.values()), key=lambda x: x['name'])
 
-    def delete_by_source(self, source: str, user_id: int):
-        """Delete documents associated with a source only if current user is owner."""
-        # Note: We must ensure user_id matches to prevent unauthorized deletions
-        self.collection.delete(where={"$and": [
-            {"source": source},
-            {"user_id": user_id}
-        ]})
+    def delete_by_source(self, source: str, user_id: int, is_admin: bool = False):
+        """Delete documents. Admins can delete anything."""
+        if is_admin:
+            where = {"source": source}
+        else:
+            where = {"$and": [
+                {"source": source},
+                {"user_id": user_id}
+            ]}
+        self.collection.delete(where=where)
 
-    def update_visibility(self, source: str, user_id: int, is_public: bool):
-        """Update is_public status for all documents of a source owned by user."""
-        # ChromaDB doesn't have a direct "update metadata by where" easily in some versions.
-        # We might need to get all IDs and update them.
-        data = self.collection.get(where={"$and": [
-            {"source": source},
-            {"user_id": user_id}
-        ]}, include=['metadatas'])
+    def update_visibility(self, source: str, user_id: int, is_public: bool, is_admin: bool = False):
+        """Update is_public status. Admins can override."""
+        if is_admin:
+            where = {"source": source}
+        else:
+            where = {"$and": [
+                {"source": source},
+                {"user_id": user_id}
+            ]}
+            
+        data = self.collection.get(where=where, include=['metadatas'])
         
         if data and data['ids']:
             new_metadatas = []
