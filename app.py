@@ -443,4 +443,10 @@ def get_available_models():
         return jsonify({"models": []})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Use environment variables for production behavior
+    is_prod = os.getenv('FLASK_ENV') == 'production'
+    app.run(
+        host='0.0.0.0',
+        port=5000,
+        debug=not is_prod
+    )

@@ -56,9 +56,6 @@
                 <div class="stats-section">
                     <div class="stats-header">
                         <h3>Veri Tabanı</h3>
-                        {% if current_user.is_admin %}
-                        <button id="reset-db-btn" class="text-btn danger" title="Tümünü Sıfırla">Sıfırla</button>
-                        {% endif %}
                     </div>
                     <div class="stats-grid">
                         <div class="stat-card">
@@ -152,6 +149,20 @@
                     <div class="settings-warning">
                         ⚠️ Değişiklikler kaydedildiğinde sistem bileşenleri yeniden başlatılacaktır.
                     </div>
+
+                    {% if current_user.is_admin %}
+                    <div class="danger-zone">
+                        <div class="danger-zone-header">
+                            <span>🚨</span>
+                            <h3>Tehlikeli Bölge</h3>
+                        </div>
+                        <div class="danger-zone-content">
+                            <p class="danger-description">Bütün vektör veri tabanını ve indekslenmiş dokümanları kalıcı
+                                olarak siler. Bu işlem geri alınamaz.</p>
+                            <button type="button" id="reset-db-btn" class="danger-btn">Veri Tabanını Sıfırla</button>
+                        </div>
+                    </div>
+                    {% endif %}
                 </form>
             </div>
             <div class="modal-footer">

@@ -108,3 +108,4 @@ websocket-client==1.9.0
 websockets==16.0
 Werkzeug==3.1.5
 zipp==3.23.0
+gunicorn==23.0.0

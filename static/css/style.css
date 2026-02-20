@@ -33,6 +33,64 @@
     color: white;
 }
 
+.danger-zone {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 1rem;
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.danger-zone-header {
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.danger-zone-header h3 {
+    color: #ef4444;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.danger-zone-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.danger-description {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.danger-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.danger-btn:hover {
+    background: #dc2626;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    transform: translateY(-1px);
+}
+
+.text-btn.danger {
+    color: #ef4444;
+}
+
+.text-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
