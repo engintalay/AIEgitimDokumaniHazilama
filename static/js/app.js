@@ -320,9 +320,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ query, source: selectedSource, chat_id: currentChatId })
             });
 
-            const data = await response.json();
-
             removeMessage(loadingMsg);
+
+            if (!response.ok) {
+                if (response.status === 504) {
+                    addMessage('bot', '❌ İstek zaman aşımına uğradı (Sunucu çok meşgul veya cevap çok uzun sürdü). Lütfen birazdan tekrar deneyin.');
+                } else {
+                    addMessage('bot', `❌ Sunucu hatası (${response.status}). Lütfen daha sonra tekrar deneyin.`);
+                }
+                return;
+            }
+
+            const data = await response.json();
 
             if (data.error) {
                 addMessage('bot', `❌ Hata: ${data.error}`);
@@ -335,7 +344,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (err) {
             removeMessage(loadingMsg);
-            addMessage('bot', '❌ Sunucuya erişilemedi.');
+            console.error('Send message error:', err);
+            addMessage('bot', '❌ Sunucuya erişilemedi. Lütfen internet bağlantınızı kontrol edin.');
         }
     }
 
