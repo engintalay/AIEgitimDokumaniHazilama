@@ -15,6 +15,11 @@ class TextProcessor:
             pages = re.split(r'---\s*SAYFA\s*\d+\s*---', text)
             return [p.strip() for p in pages if p.strip()]
 
+        # Normalize broken PDF font extractions (Missing dotless 'ı' usually becomes U+FFFD or similar)
+        # Because 'ı' is overwhelmingly the most common missing glyph in TR PDFs, we map the unknown char to it
+        text = text.replace('\ufffd', 'ı')
+        text = text.replace('\uf0fd', 'ı') # Common PUA mapping for 'ı'
+
         # Initial split by double newlines or single newlines with spacing
         paragraphs = re.split(r'\n\s*\n', text)
         
@@ -54,7 +59,7 @@ class TextProcessor:
         # Keywords that start a section we want to skip until a main clause is found
         skip_start_patterns = re.compile(r'^(Annex|Appendix|Bibliography|Contents|İçindekiler|Foreword|Introduction|European foreword|Endorsement notice|National foreword|Dizin|Önsöz|Giriş|Kaynaķça)', re.I)
         # Keywords that signal a main clause (e.g., "1 Scope", "2 Normative...") to stop skipping
-        keep_start_pattern = re.compile(r'^\d+(\.\d+)?\s+[A-Z\xc7\xd6\xdc\u0130\u015e\u011e]', re.I) 
+        keep_start_pattern = re.compile(r'^\d+(\.\d+)?\s+[A-ZÇÖÜİŞĞ]', re.I) 
         
         for unit in initial_units:
             lines = [l.strip() for l in unit.splitlines() if l.strip()]
@@ -90,7 +95,7 @@ class TextProcessor:
         current = initial_units[0]
         
         # List marker pattern (matches common bullets and markers at line start)
-        list_line_pattern = re.compile(r'^(\s*[\da-z]{1,3}[.)]\s*|\s*[^\w\s]\s*)', re.IGNORECASE)
+        list_line_pattern = re.compile(r'^(\s*[\da-zÇÖÜİŞĞçöüişğ]{1,3}[.)]\s*|\s*[^\w\s]\s*)', re.IGNORECASE)
 
         for i in range(1, len(initial_units)):
             next_unit = initial_units[i]
@@ -107,7 +112,7 @@ class TextProcessor:
             
             # Rule 2: Citation/Reference Detection (Merge short trailing block with previous)
             is_citation = len(next_unit) < 100 and not re.search(r'[.!?]$', next_unit.strip()) and \
-                          (',' in next_unit or re.search(r'^[A-ZÇÖÜİŞĞ]', next_unit))
+                          (',' in next_unit or re.search(r'^[A-ZÇÖÜİŞĞçöüişğ]', next_unit))
             
             # Rule 3: Literary connectors
             next_starts_connector = re.match(r'^(İmdi|\(\.\.\.\)|Ha,|Meğer|Oysa|Halbuki)', next_unit, re.I)

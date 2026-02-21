@@ -31,11 +31,16 @@ def init_auth(app):
     )
 
 def handle_google_login():
-    from flask import current_app
+    from flask import current_app, request
     config = current_app.config.get('GOOGLE_AUTH', {})
     
+    host = request.host.split(':')[0]
     manual_uri = config.get('redirect_uri')
-    if manual_uri:
+    
+    # Check if testing locally
+    if host in ['localhost', '127.0.0.1']:
+        redirect_uri = url_for('auth_callback', _external=True)
+    elif manual_uri:
         redirect_uri = manual_uri
     else:
         redirect_uri = url_for('auth_callback', _external=True)

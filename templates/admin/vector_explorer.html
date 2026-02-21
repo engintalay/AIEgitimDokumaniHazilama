@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Vector DB Gezgini</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            height: auto !important;
+            min-height: 100vh;
+            overflow: visible !important;
+            position: relative;
+        }
+
+        .admin-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .explorer-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+            align-items: start;
+            flex: 1;
+        }
+
+        @media (max-width: 900px) {
+            .explorer-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .sidebar-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 1rem;
+            border: 1px solid var(--border-color);
+            position: sticky;
+            top: 2rem;
+            height: fit-content;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .control-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .search-area {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 1rem;
+            border: 1px solid var(--border-color);
+            margin-bottom: 2rem;
+        }
+
+        .vector-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            transition: all 0.2s;
+        }
+
+        .vector-item:hover {
+            border-color: var(--accent-primary);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .vector-metadata {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.8rem;
+        }
+
+        .meta-tag {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .meta-tag.accent {
+            background: rgba(var(--accent-rgb), 0.1);
+            color: var(--accent-primary);
+            border-color: rgba(var(--accent-rgb), 0.2);
+        }
+
+        .content-preview {
+            line-height: 1.5;
+            color: var(--text-main);
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+            line-clamp: 4;
+        }
+
+        .vector-item.expanded .content-preview {
+            display: block;
+            -webkit-line-clamp: initial;
+            line-clamp: initial;
+        }
+
+        .score-badge {
+            float: right;
+            font-family: monospace;
+            font-weight: 600;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 2rem;
+            align-items: center;
+        }
+
+        .nav-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="admin-container">
+        <header class="nav-header">
+            <div>
+                <h1>🧠 Vector DB Gezgini</h1>
+                <p style="color: var(--text-muted); font-size: 0.9rem;">Veri tabanındaki tüm indeksli paragrafları ve
+                    benzerlik skorlarını inceleyin.</p>
+            </div>
+            <nav style="display: flex; gap: 1rem;">
+                <a href="/admin" class="view-btn"
+                    style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">👥
+                    Yönetim</a>
+                <a href="/" class="view-btn"
+                    style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">🏠
+                    Uygulama</a>
+            </nav>
+        </header>
+
+        <div class="explorer-grid">
+            <div class="sidebar-controls">
+                <div class="control-group">
+                    <label>🔍 Vektörel Arama (Semantic Search)</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="search-query" placeholder="Sorgu cümlesi yazın..." style="flex: 1;">
+                        <button onclick="searchVector()" class="primary-btn" style="padding: 0.5rem 1rem;">Ara</button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>🗂️ Kaynağa Göre Filtrele</label>
+                    <select id="source-filter" onchange="loadVectorData(0)">
+                        <option value="">Tüm Kaynaklar</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>📊 Toplam Kayıt</label>
+                    <div id="total-count" style="font-size: 1.5rem; font-weight: 600; color: var(--accent-primary);">0
+                    </div>
+                </div>
+
+                <button onclick="resetView()" class="view-btn" style="width: 100%; text-align: center;">🔄 Görünümü
+                    Sıfırla</button>
+            </div>
+
+            <div class="results-area">
+                <div id="status-info" style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-muted);"></div>
+                <div id="vector-list">
+                    <p>Yükleniyor...</p>
+                </div>
+
+                <div id="pagination" class="pagination" style="display: none;">
+                    <button id="prev-btn" class="view-btn" onclick="changePage(-1)">◀ Önceki</button>
+                    <span id="page-info">Sayfa 1</span>
+                    <button id="next-btn" class="view-btn" onclick="changePage(1)">Sonraki ▶</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentOffset = 0;
+        const limit = 20;
+        let isSearchMode = false;
+
+        async function init() {
+            await loadSources();
+            await loadVectorData();
+        }
+
+        async function loadSources() {
+            const res = await fetch('/stats');
+            const data = await res.json();
+            const select = document.getElementById('source-filter');
+            data.sources.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.name;
+                opt.textContent = s.name;
+                select.appendChild(opt);
+            });
+        }
+
+        async function loadVectorData(offset = 0) {
+            isSearchMode = false;
+            currentOffset = offset;
+            const source = document.getElementById('source-filter').value;
+            const res = await fetch(`/admin/vector_data?limit=${limit}&offset=${offset}${source ? '&source=' + encodeURIComponent(source) : ''}`);
+            const data = await res.json();
+
+            document.getElementById('total-count').textContent = data.total;
+            renderList(data.results, "Tüm Kayıtlar");
+            updatePagination(data.total);
+        }
+
+        async function searchVector() {
+            const query = document.getElementById('search-query').value;
+            if (!query) return;
+
+            isSearchMode = true;
+            document.getElementById('vector-list').innerHTML = '<p>Vektörel arama yapılıyor...</p>';
+
+            const source = document.getElementById('source-filter').value;
+            const res = await fetch('/admin/vector_search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query, source, n_results: 10 })
+            });
+            const data = await res.json();
+
+            renderList(data.results, `'${query}' için anlamsal sonuçlar`);
+            document.getElementById('pagination').style.display = 'none';
+        }
+
+        function renderList(items, title) {
+            const container = document.getElementById('vector-list');
+            document.getElementById('status-info').textContent = title;
+            container.innerHTML = '';
+
+            if (!items || items.length === 0) {
+                container.innerHTML = '<p>Kayıt bulunamadı.</p>';
+                return;
+            }
+
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'vector-item';
+                div.onclick = () => div.classList.toggle('expanded');
+
+                const meta = item.metadata;
+                const scoreHtml = item.score !== undefined ? `<span class="score-badge">🎯 Skor: ${item.score}</span>` : '';
+
+                div.innerHTML = `
+                    ${scoreHtml}
+                    <div class="content-preview">${item.content}</div>
+                    <div class="vector-metadata">
+                        <span class="meta-tag accent">📄 ${meta.source}</span>
+                        <span class="meta-tag">🆔 ID: ${item.id.split('_').pop()}</span>
+                        <span class="meta-tag">👤 User: ${meta.user_name || meta.user_id}</span>
+                        <span class="meta-tag">🌍 ${meta.is_public ? 'Genel' : 'Özel'}</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function updatePagination(total) {
+            const pag = document.getElementById('pagination');
+            if (isSearchMode || total <= limit) {
+                pag.style.display = 'none';
+                return;
+            }
+            pag.style.display = 'flex';
+            const pageCount = Math.ceil(total / limit);
+            const currentPage = Math.floor(currentOffset / limit) + 1;
+            document.getElementById('page-info').textContent = `${currentPage} / ${pageCount} Sayfa`;
+            document.getElementById('prev-btn').disabled = currentPage === 1;
+            document.getElementById('next-btn').disabled = currentPage === pageCount;
+        }
+
+        function changePage(dir) {
+            loadVectorData(currentOffset + (dir * limit));
+        }
+
+        function resetView() {
+            document.getElementById('search-query').value = '';
+            document.getElementById('source-filter').value = '';
+            loadVectorData(0);
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

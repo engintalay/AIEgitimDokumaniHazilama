@@ -5,11 +5,11 @@ import time
 from dotenv import load_dotenv
 
 from werkzeug.middleware.proxy_fix import ProxyFix
-load_dotenv() # Limport logging
+load_dotenv()
 import logging
 import time
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory, Response
 import json
 from werkzeug.utils import secure_filename
 from core.document_parser import DocumentParser
@@ -53,8 +53,17 @@ app.config['REPORT_FOLDER'] = 'data/reports'
 db.init_app(app)
 init_auth(app)
 
+# JSON Turkish Character Fix
+app.json.ensure_ascii = False 
+
 login_manager = LoginManager()
 login_manager.init_app(app)
+
+@app.after_request
+def add_header(response):
+    if response.mimetype == 'application/javascript' or response.mimetype == 'application/json':
+        response.charset = 'utf-8'
+    return response
 login_manager.login_view = 'login'
 
 @login_manager.user_loader
@@ -146,21 +155,24 @@ def upload_file():
         return jsonify({"error": "Dosya seçilmedi"}), 400
     
     if file:
-        progress_data[job_id] = 0
+        progress_data[job_id] = {"progress": 0, "status": "Dosya sunucuya alındı, işleme başlanıyor..."}
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
         
-        logger.info(f"📁 Dosya yüklendi: {filename} (User: {current_user.id})")
+        logger.info(f"📁 Dosya yüklendi: {filename} (Kullanıcı: {current_user.name})")
         
         try:
             # 1. Parse
-            logger.debug(f"Parsing: {filename}")
+            logger.info(f"📑 {filename} okunuyor ve metin ayrıştırılıyor...")
+            progress_data[job_id] = {"progress": 5, "status": "Doküman içerisindeki metinler çıkarılıyor..."}
             raw_text = DocumentParser.parse(file_path)
             
             # 2. Split
+            logger.info(f"📑 {filename} paragraflara bölünüyor...")
+            progress_data[job_id] = {"progress": 10, "status": "Metinler küçük paragraflara ayrıştırılıyor..."}
             paragraphs = TextProcessor.split_into_paragraphs(raw_text)
-            logger.info(f"📑 {len(paragraphs)} paragraf ayrıştırıldı.")
+            logger.info(f"📑 {len(paragraphs)} paragraf başarıyla ayrıştırıldı.")
             
             # 3. Embed and Index
             documents, embeddings, metadatas, ids = [], [], [], []
@@ -179,10 +191,12 @@ def upload_file():
                 ids.append(f"{filename}_{uuid.uuid4()}_{i}")
                 
                 # Update progress
-                progress_data[job_id] = int(((i + 1) / total) * 100)
+                current_percent = 10 + int(((i + 1) / total) * 90)
+                status_msg = f"Vektörleştiriliyor ve İndeksleniyor... ({i+1}/{total})"
+                progress_data[job_id] = {"progress": current_percent, "status": status_msg}
                 
                 if len(documents) >= 10:
-                    logger.debug(f"İndeksleniyor... ({i+1}/{total})")
+                    logger.info(f"İndeksleniyor... ({i+1}/{total})")
                     vector_db.add_documents(documents, embeddings, metadatas, ids)
                     documents, embeddings, metadatas, ids = [], [], [], []
             
@@ -190,7 +204,7 @@ def upload_file():
                 vector_db.add_documents(documents, embeddings, metadatas, ids)
             
             logger.info(f"✅ İndeksleme tamamlandı: {filename}")
-            progress_data[job_id] = 100
+            progress_data[job_id] = {"progress": 100, "status": "İşlem tamamlandı!"}
                 
             return jsonify({
                 "message": f"'{filename}' başarıyla yüklendi ve {len(paragraphs)} paragraf indekslendi.",
@@ -226,7 +240,7 @@ def ask_question():
     user_msg = Message(chat_id=active_chat.id, role='user', content=query)
     db.session.add(user_msg)
     
-    logger.info(f"❓ Soru: {query} (Chat: {active_chat.id})")
+    logger.info(f"❓ Soru: {query} (Kullanıcı: {current_user.name}, Chat: {active_chat.id})")
     
     try:
         # 1. Get embedding
@@ -302,7 +316,7 @@ def ask_question():
 def handle_chats():
     if request.method == 'GET':
         chats = Chat.query.filter_by(user_id=current_user.id).order_by(Chat.updated_at.desc()).all()
-        logger.info(f"👤 Kullanıcı {current_user.id} sohbet geçmişini istedi. Bulunan: {len(chats)}")
+        logger.info(f"👤 Kullanıcı '{current_user.name}' sohbet geçmişini istedi. Bulunan: {len(chats)}")
         return jsonify([{
             "id": c.id,
             "title": c.title,
@@ -373,18 +387,11 @@ def get_stats():
 
 @app.route('/progress/<job_id>')
 def get_progress(job_id):
-    def generate():
-        while True:
-            progress = progress_data.get(job_id, 0)
-            yield f"data: {progress}\n\n"
-            if progress >= 100:
-                # Keep entry for a bit so client can catch the final 100
-                time.sleep(2)
-                if job_id in progress_data:
-                    del progress_data[job_id]
-                break
-            time.sleep(0.5)
-    return Response(generate(), mimetype='text/event-stream')
+    data = progress_data.get(job_id, {"progress": 0, "status": ""})
+    if isinstance(data, int): # backward compatibility for safety
+        data = {"progress": data, "status": "İşleniyor..."}
+    # Frontend will stop polling when it sees 100.
+    return jsonify(data)
 
 @app.route('/delete_source', methods=['POST'])
 @login_required
@@ -459,7 +466,7 @@ def handle_config():
             })
             db.session.commit()
             
-            logger.info(f"⚙️ Kullanıcı {current_user.id} ayarları güncellendi.")
+            logger.info(f"⚙️ Kullanıcı '{current_user.name}' ayarları güncellendi.")
             return jsonify({"message": "Kişisel ayarlarınız başarıyla kaydedildi."})
         except Exception as e:
             logger.error(f"Config kaydetme hatası: {str(e)}")
@@ -600,6 +607,81 @@ def admin_reports_data():
         "timestamp": r.timestamp.isoformat(),
         "message_id": r.message_id
     } for r in reports])
+
+@app.route('/admin/vector_explorer')
+@login_required
+@admin_required
+def admin_vector_explorer():
+    return render_template('admin/vector_explorer.html')
+
+@app.route('/admin/vector_data')
+@login_required
+@admin_required
+def admin_vector_data():
+    source = request.args.get('source')
+    limit = request.args.get('limit', 100, type=int)
+    offset = request.args.get('offset', 0, type=int)
+    
+    where = None
+    if source:
+        where = {"source": source}
+        
+    try:
+        data = vector_db.get_documents_with_metadata(limit=limit, offset=offset, where=where)
+        results = []
+        if data and data['ids']:
+            for i in range(len(data['ids'])):
+                results.append({
+                    "id": data['ids'][i],
+                    "content": data['documents'][i],
+                    "metadata": data['metadatas'][i]
+                })
+        return jsonify({
+            "total": vector_db.get_collection_count(),
+            "results": results,
+            "limit": limit,
+            "offset": offset
+        })
+    except Exception as e:
+        logger.error(f"Vector data error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/admin/vector_search', methods=['POST'])
+@login_required
+@admin_required
+def admin_vector_search():
+    data = request.json
+    query = data.get('query')
+    source = data.get('source')
+    n_results = data.get('n_results', 5)
+    
+    if not query:
+        return jsonify({"error": "Sorgu boş olamaz"}), 400
+        
+    try:
+        query_emb = embedding_client.get_embedding(query)
+        # Search without user_id filter to see all results
+        search_results = vector_db.query(query_emb, n_results=n_results, source=source)
+        
+        results = []
+        if search_results and search_results['ids']:
+            ids = search_results['ids'][0]
+            docs = search_results['documents'][0]
+            metas = search_results['metadatas'][0]
+            distances = search_results['distances'][0] if 'distances' in search_results else [0] * len(ids)
+            
+            for i in range(len(ids)):
+                results.append({
+                    "id": ids[i],
+                    "content": docs[i],
+                    "metadata": metas[i],
+                    "score": round(1 - distances[i], 4) if distances[i] <= 1 else 0
+                })
+                
+        return jsonify({"results": results})
+    except Exception as e:
+        logger.error(f"Vector search error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/admin/reports/<int:report_id>/resolve', methods=['POST'])
 @login_required

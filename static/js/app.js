@@ -155,8 +155,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (fileInput.files.length > 0) handleUpload(fileInput.files[0]);
     });
 
+    let isUploading = false;
+
     async function handleUpload(file) {
+        if (isUploading) {
+            console.warn('Upload already in progress, skipping...');
+            return;
+        }
+
+        // Cloudflare Free Tier upload limit check (approx 100MB)
+        // Skip this check if running on localhost/127.0.0.1
+        const hostname = window.location.hostname;
+        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+        const MAX_FILE_SIZE = 99 * 1024 * 1024; // 99 MB
+        if (!isLocalhost && file.size > MAX_FILE_SIZE) {
+            addMessage('bot', `❌ <b>Hata:</b> Seçilen dosya (${(file.size / (1024 * 1024)).toFixed(2)} MB) çok büyük. Lütfen 100MB'dan küçük bir dosya seçin.`);
+            fileInput.value = '';
+            return;
+        }
+
+        isUploading = true;
+
         const jobId = 'job_' + Math.random().toString(36).substr(2, 9);
+        console.log(`Starting upload: ${file.name} (Job: ${jobId})`);
 
         appStatus.textContent = 'İşleniyor...';
         appStatus.classList.add('processing');
@@ -168,26 +190,56 @@ document.addEventListener('DOMContentLoaded', () => {
         globalProgressBar.style.width = '0%';
         globalProgressText.textContent = '0%';
 
-        const evtSource = new EventSource(`/progress/${jobId}`);
-        evtSource.onmessage = (e) => {
-            const p = e.data;
-            globalProgressBar.style.width = p + '%';
-            globalProgressText.textContent = p + '%';
-            if (parseInt(p) >= 100) evtSource.close();
-        };
-
-        const processingMsg = addMessage('bot', `⌛ <b>${file.name}</b> işleniyor, lütfen bekleyin...<br><span class="spinner"></span> Paragraflara ayrılıyor ve vektörleştiriliyor...`, true);
+        const processingMsg = addMessage('bot', `⌛ <b>${file.name}</b> sunucuya gönderiliyor...<br><span class="spinner"></span> Lütfen bekleyin...`, true);
 
         const formData = new FormData();
         formData.append('file', file);
         formData.append('job_id', jobId);
 
+        let pollInterval;
         try {
-            const response = await fetch('/upload', {
-                method: 'POST',
-                body: formData
+            const xhr = new XMLHttpRequest();
+            const uploadPromise = new Promise((resolve, reject) => {
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        globalProgressBar.style.width = percent + '%';
+                        globalProgressText.textContent = percent + '%';
+                        if (percent === 100) {
+                            processingMsg.querySelector('.message-content').innerHTML = `⌛ <b>${file.name}</b> işleniyor, lütfen bekleyin...<br><span class="spinner"></span> Dosya okuma sırasına alındı...`;
+                        }
+                    }
+                };
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
+                    else reject(new Error(xhr.responseText || 'Sunucu hatası'));
+                };
+                xhr.onerror = () => reject(new Error('Bağlantı hatası'));
+                xhr.open('POST', '/upload');
+                xhr.send(formData);
             });
-            const data = await response.json();
+
+            // Start polling as well (for server-side progress)
+            pollInterval = setInterval(async () => {
+                try {
+                    const pollResponse = await fetch(`/progress/${jobId}`);
+                    const pollData = await pollResponse.json();
+                    const p = pollData.progress;
+                    const statusText = pollData.status;
+
+                    if (p > 0 || statusText) { // Update if server-side processing has actually started
+                        globalProgressBar.style.width = p + '%';
+                        globalProgressText.textContent = p + '%';
+                        const displayStatus = statusText || "Paragraflara ayrılıyor ve vektörleştiriliyor...";
+                        processingMsg.querySelector('.message-content').innerHTML = `⌛ <b>${file.name}</b> işleniyor, lütfen bekleyin...<br><span class="spinner"></span> <span style="color:#2563eb; font-weight:500;">${displayStatus}</span> (${p}%)`;
+                    }
+                    if (parseInt(p) >= 100) clearInterval(pollInterval);
+                } catch (err) {
+                    console.error('Progress poll failed:', err);
+                }
+            }, 1000);
+
+            const data = await uploadPromise;
 
             if (data.error) {
                 removeMessage(processingMsg);
@@ -212,11 +264,13 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             dropZone.style.pointerEvents = 'auto';
             dropZone.style.opacity = '1';
+            fileInput.value = '';
+            isUploading = false;
 
             // Hide progress after a short delay
             setTimeout(() => {
                 globalProgressContainer.style.display = 'none';
-                evtSource.close();
+                clearInterval(pollInterval);
             }, 1000);
         }
     }

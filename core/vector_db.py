@@ -116,6 +116,15 @@ class VectorDB:
             return True
         return False
 
+    def get_documents_with_metadata(self, limit: int = 100, offset: int = 0, where: Dict = None) -> Dict[str, Any]:
+        """Retrieve documents, IDs and metadatas with optional filtering."""
+        return self.collection.get(
+            limit=limit,
+            offset=offset,
+            where=where,
+            include=['documents', 'metadatas']
+        )
+
     def reset(self):
         """Clear all documents in the collection."""
         name = self.collection.name

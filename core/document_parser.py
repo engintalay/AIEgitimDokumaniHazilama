@@ -47,12 +47,14 @@ class DocumentParser:
                 tabs = page.find_tables()
                 table_areas = [t.bbox for t in tabs.tables]
                 
-                # 2. Extract text blocks
-                blocks = page.get_text("blocks")
+                # 2. Extract text blocks - using default extraction flags
+                # Default flags preserve the best mapping for custom Turkish fonts
+                blocks = page.get_text("blocks", sort=True)
                 for b in blocks:
                     block_bbox = b[:4]
                     is_inside_table = False
                     for t_bbox in table_areas:
+                        # Check if block center is inside table bbox
                         mid_x = (block_bbox[0] + block_bbox[2]) / 2
                         mid_y = (block_bbox[1] + block_bbox[3]) / 2
                         if (t_bbox[0] <= mid_x <= t_bbox[2] and 
@@ -63,6 +65,7 @@ class DocumentParser:
                     if not is_inside_table:
                         content = b[4].strip()
                         if content:
+                            # Normalize whitespace but keep Turkish characters intact
                             page_content.append(content)
                 
                 # 3. Add extracted tables as Markdown
