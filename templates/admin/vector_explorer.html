@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel - Vector DB Gezgini</title>
+    <title>Vector DB Gezgini</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
@@ -158,9 +158,11 @@
                     benzerlik skorlarını inceleyin.</p>
             </div>
             <nav style="display: flex; gap: 1rem;">
+                {% if is_admin %}
                 <a href="/admin" class="view-btn"
                     style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">👥
                     Yönetim</a>
+                {% endif %}
                 <a href="/" class="view-btn"
                     style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">🏠
                     Uygulama</a>
@@ -235,7 +237,7 @@
             isSearchMode = false;
             currentOffset = offset;
             const source = document.getElementById('source-filter').value;
-            const res = await fetch(`/admin/vector_data?limit=${limit}&offset=${offset}${source ? '&source=' + encodeURIComponent(source) : ''}`);
+            const res = await fetch(`/vector_data?limit=${limit}&offset=${offset}${source ? '&source=' + encodeURIComponent(source) : ''}`);
             const data = await res.json();
 
             document.getElementById('total-count').textContent = data.total;
@@ -251,7 +253,7 @@
             document.getElementById('vector-list').innerHTML = '<p>Vektörel arama yapılıyor...</p>';
 
             const source = document.getElementById('source-filter').value;
-            const res = await fetch('/admin/vector_search', {
+            const res = await fetch('/vector_search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query, source, n_results: 10 })

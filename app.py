@@ -220,7 +220,7 @@ def upload_file():
 def ask_question():
     data = request.json
     query = data.get('query')
-    source = data.get('source')
+    sources = data.get('sources', [])
     chat_id = data.get('chat_id')
     
     if not query:
@@ -248,7 +248,7 @@ def ask_question():
         
         # 2. Query Vector DB
         rag_cfg = config.get('rag', {})
-        results = vector_db.query(query_emb, n_results=rag_cfg.get('top_k', 3), user_id=current_user.id, source=source)
+        results = vector_db.query(query_emb, n_results=rag_cfg.get('top_k', 3), user_id=current_user.id, source=sources if sources else None)
         
         contexts = results.get('documents', [[]])[0]
         metadatas = results.get('metadatas', [[]])[0]
@@ -765,16 +765,14 @@ def admin_report_reply(report_id):
         "status": report.status
     })
 
-@app.route('/admin/vector_explorer')
+@app.route('/vector_explorer')
 @login_required
-@admin_required
-def admin_vector_explorer():
-    return render_template('admin/vector_explorer.html')
+def vector_explorer():
+    return render_template('admin/vector_explorer.html', is_admin=current_user.is_admin)
 
-@app.route('/admin/vector_data')
+@app.route('/vector_data')
 @login_required
-@admin_required
-def admin_vector_data():
+def vector_data():
     source = request.args.get('source')
     limit = request.args.get('limit', 100, type=int)
     offset = request.args.get('offset', 0, type=int)
@@ -782,7 +780,14 @@ def admin_vector_data():
     where = None
     if source:
         where = {"source": source}
-        
+    
+    if not current_user.is_admin:
+        # Prevent normal users from viewing vectors belonging to others
+        if where is None:
+            where = {"$or": [{"user_id": current_user.id}, {"is_public": True}]}
+        else:
+            where = {"$and": [{"source": source}, {"$or": [{"user_id": current_user.id}, {"is_public": True}]}]}
+            
     try:
         data = vector_db.get_documents_with_metadata(limit=limit, offset=offset, where=where)
         results = []
@@ -803,10 +808,9 @@ def admin_vector_data():
         logger.error(f"Vector data error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/admin/vector_search', methods=['POST'])
+@app.route('/vector_search', methods=['POST'])
 @login_required
-@admin_required
-def admin_vector_search():
+def vector_search():
     data = request.json
     query = data.get('query')
     source = data.get('source')
@@ -817,8 +821,9 @@ def admin_vector_search():
         
     try:
         query_emb = embedding_client.get_embedding(query)
-        # Search without user_id filter to see all results
-        search_results = vector_db.query(query_emb, n_results=n_results, source=source)
+        # Search with user_id context to secure isolation
+        search_user_id = None if current_user.is_admin else current_user.id
+        search_results = vector_db.query(query_emb, n_results=n_results, source=source, user_id=search_user_id)
         
         results = []
         if search_results and search_results['ids']:

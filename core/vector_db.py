@@ -1,7 +1,7 @@
 import os
 import chromadb
 from chromadb.config import Settings
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
 class VectorDB:
     """Wrapper for ChromaDB operations."""
@@ -22,7 +22,7 @@ class VectorDB:
             ids=ids
         )
 
-    def query(self, query_embedding: List[float], n_results: int = 3, user_id: Optional[int] = None, source: Optional[str] = None) -> Dict[str, Any]:
+    def query(self, query_embedding: List[float], n_results: int = 3, user_id: Optional[int] = None, source: Optional[Union[str, List[str]]] = None) -> Dict[str, Any]:
         """Search for most similar documents with ownership and optional source filtering."""
         filters = []
         
@@ -35,7 +35,13 @@ class VectorDB:
         
         # Source Filter
         if source:
-            filters.append({"source": source})
+            if isinstance(source, list):
+                if len(source) == 1:
+                    filters.append({"source": source[0]})
+                elif len(source) > 1:
+                    filters.append({"source": {"$in": source}})
+            else:
+                filters.append({"source": source})
             
         # Combine filters
         if len(filters) == 1:

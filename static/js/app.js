@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeDocName = document.getElementById('active-doc-name');
     const clearSourceBtn = document.getElementById('clear-source-btn');
 
-    let selectedSource = null;
+    let selectedSources = [];
     let currentConfig = null;
     let currentChatId = null;
 
@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     newChatBtn.onclick = startNewChat;
 
     clearSourceBtn.onclick = () => {
-        selectedSource = null;
+        selectedSources = [];
         updateActiveDocUI();
         updateStats(); // Refresh source list selection
     };
@@ -283,8 +283,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateActiveDocUI() {
-        if (selectedSource) {
-            activeDocName.textContent = selectedSource;
+        if (selectedSources.length > 0) {
+            activeDocName.textContent = selectedSources.join(', ');
             activeDocIndicator.style.display = 'flex';
         } else {
             activeDocIndicator.style.display = 'none';
@@ -388,7 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
         userInput.value = '';
         userInput.style.height = 'auto';
 
-        addMessage('user', query + (selectedSource ? ` (Dosya: ${selectedSource})` : ''));
+        addMessage('user', query + (selectedSources.length > 0 ? ` (Dosya: ${selectedSources.join(', ')})` : ''));
 
         const loadingMsg = addMessage('bot', `
             <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
@@ -414,7 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query, source: selectedSource, chat_id: currentChatId }),
+                body: JSON.stringify({ query, sources: selectedSources, chat_id: currentChatId }),
                 signal: currentAbortController.signal
             });
 
@@ -473,21 +473,23 @@ document.addEventListener('DOMContentLoaded', () => {
         dbSources.innerHTML = '';
         sources.forEach(source => {
             const div = document.createElement('div');
-            div.className = `source-item ${selectedSource === source.name ? 'selected' : ''}`;
+            div.className = `source-item ${selectedSources.includes(source.name) ? 'selected' : ''}`;
 
             const privacyIcon = source.is_public ? '🌐' : '🔒';
             const privacyTitle = source.is_public ? 'Herkes görebilir' : 'Sadece siz';
 
-            let actionHtml = '';
+            let actionHtml = `
+                <a href="/admin/vector_explorer?source=${encodeURIComponent(source.name)}" target="_blank" class="view-vector-btn" title="Vektörleri Görüntüle / Ara" style="text-decoration:none;">👁️</a>
+            `;
             if (source.is_owner) {
-                actionHtml = `
+                actionHtml += `
                     <button class="toggle-public-btn" data-source="${source.name}" data-public="${source.is_public}" title="${source.is_public ? 'Özel yap' : 'Paylaş'}">
                         ${privacyIcon}
                     </button>
                     <button class="delete-source-btn" data-source="${source.name}" title="Bu kaynağı sil">🗑️</button>
                 `;
             } else {
-                actionHtml = `<span class="shared-badge" title="Paylaşılan doküman">${privacyIcon}</span>`;
+                actionHtml += `<span class="shared-badge" title="Paylaşılan doküman">${privacyIcon}</span>`;
             }
 
             div.innerHTML = `
@@ -498,15 +500,17 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
 
             div.onclick = (e) => {
-                if (e.target.closest('button')) return;
+                if (e.target.closest('button') || e.target.closest('a')) return;
 
-                if (selectedSource === source.name) {
-                    selectedSource = null;
+                const idx = selectedSources.indexOf(source.name);
+                if (idx > -1) {
+                    selectedSources.splice(idx, 1);
+                    div.classList.remove('selected');
                 } else {
-                    selectedSource = source.name;
+                    selectedSources.push(source.name);
+                    div.classList.add('selected');
                 }
                 updateActiveDocUI();
-                renderSourceList(data.sources); // Re-render to show selection
             };
 
             dbSources.appendChild(div);

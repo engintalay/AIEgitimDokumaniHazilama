@@ -98,7 +98,7 @@
                 <a href="/admin/reports" class="view-btn"
                     style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">🚩
                     Hata Raporları</a>
-                <a href="/admin/vector_explorer" class="view-btn"
+                <a href="/vector_explorer" class="view-btn"
                     style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);">🧠
                     Vector DB Gezgini</a>
                 <a href="/" class="view-btn"
@@ -215,7 +215,7 @@
                 const select = document.getElementById('config-model-name');
                 const providerType = document.getElementById('config-model-type').value;
                 const endpoint = document.getElementById('config-endpoint').value;
-                
+
                 const prevVal = select.value;
                 select.innerHTML = '<option value="">Yükleniyor...</option>';
 
@@ -230,8 +230,13 @@
                 if (data.models && data.models.length > 0) {
                     data.models.forEach(model => {
                         const option = document.createElement('option');
-                        option.value = model.id;
-                        option.textContent = model.name;
+                        if (typeof model === 'string') {
+                            option.value = model;
+                            option.textContent = model;
+                        } else {
+                            option.value = model.id;
+                            option.textContent = model.name;
+                        }
                         select.appendChild(option);
                     });
                     if (prevVal) select.value = prevVal;
@@ -248,17 +253,24 @@
             document.getElementById('settings-modal-title').textContent = `${userName} Ayarları`;
             document.getElementById('config-user-id').value = userId;
 
-            // Fetch current config for user
+            // First fetch current config for user
             try {
-                await fetchAvailableModels(); // Load models dropdown first
                 const response = await fetch(`/admin/users/${userId}/config`);
                 const config = await response.json();
 
                 if (config.model) {
                     if (config.model.type) document.getElementById('config-model-type').value = config.model.type;
-                    if (config.model.name) document.getElementById('config-model-name').value = config.model.name;
                     if (config.model.endpoint) document.getElementById('config-endpoint').value = config.model.endpoint;
                 }
+
+                // Now use the populated DOM fields to fetch the correct models for this provider
+                await fetchAvailableModels();
+
+                // Finally set the proper model selection
+                if (config.model && config.model.name) {
+                    document.getElementById('config-model-name').value = config.model.name;
+                }
+
                 modal.classList.add('active');
             } catch (err) {
                 console.error('Config fetch error:', err);
