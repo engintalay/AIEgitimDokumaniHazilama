@@ -479,7 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const privacyTitle = source.is_public ? 'Herkes görebilir' : 'Sadece siz';
 
             let actionHtml = `
-                <a href="/admin/vector_explorer?source=${encodeURIComponent(source.name)}" target="_blank" class="view-vector-btn" title="Vektörleri Görüntüle / Ara" style="text-decoration:none;">👁️</a>
+                <a href="/vector_explorer?source=${encodeURIComponent(source.name)}" target="_blank" class="view-vector-btn" title="Vektörleri Görüntüle / Ara" style="text-decoration:none;">👁️</a>
             `;
             if (source.is_owner) {
                 actionHtml += `
