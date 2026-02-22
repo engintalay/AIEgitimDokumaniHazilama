@@ -102,10 +102,10 @@ def get_components():
     model_cfg = config.get('model', {})
     
     embedding_client = EmbeddingClient(
-        provider=model_cfg.get('type', 'ollama'),
-        endpoint=model_cfg.get('endpoint', 'http://127.0.0.1:11434'),
+        provider=rag_cfg.get('embedding_provider', 'ollama'),
+        endpoint=rag_cfg.get('embedding_endpoint', 'http://127.0.0.1:11434'),
         model=rag_cfg.get('embedding_model', 'nomic-embed-text'),
-        api_key=model_cfg.get('api_key', '')
+        api_key=rag_cfg.get('embedding_api_key', '')
     )
     
     vector_db = VectorDB(
@@ -244,17 +244,25 @@ def ask_question():
     logger.info(f"❓ Soru: {query} (Kullanıcı: {current_user.name}, Chat: {active_chat.id})")
     
     try:
-        # 1. Get embedding
-        query_emb = embedding_client.get_embedding(query)
+        # 2. Query Vector DB - ONLY if sources are selected
+        contexts = []
+        metadatas = []
+        context_text = ""
         
-        # 2. Query Vector DB
-        rag_cfg = config.get('rag', {})
-        results = vector_db.query(query_emb, n_results=rag_cfg.get('top_k', 3), user_id=current_user.id, source=sources if sources else None)
-        
-        contexts = results.get('documents', [[]])[0]
-        metadatas = results.get('metadatas', [[]])[0]
-        
-        context_text = "\n\n".join([f"[Kaynak: {m['source']}]\n{c}" for c, m in zip(contexts, metadatas)])
+        if sources:
+            logger.info(f"📂 Seçili kaynaklar: {sources}")
+            # 1. Get embedding (only needed for RAG)
+            query_emb = embedding_client.get_embedding(query)
+            
+            rag_cfg = config.get('rag', {})
+            results = vector_db.query(query_emb, n_results=rag_cfg.get('top_k', 3), user_id=current_user.id, source=sources, query_text=query)
+            
+            contexts = results.get('documents', [[]])[0]
+            metadatas = results.get('metadatas', [[]])[0]
+            context_text = "\n\n".join([f"[Kaynak: {m['source']}]\n{c}" for c, m in zip(contexts, metadatas)])
+        else:
+            logger.info("📂 Kaynak seçilmedi, genel modda sorgulanıyor.")
+            context_text = "DİKKAT: Kullanıcı herhangi bir doküman seçmedi. Bu cevabı genel bilginle ver."
         
         # 2.5 Retrieve Chat History (last 5 messages)
         history_msgs = Message.query.filter_by(chat_id=active_chat.id).order_by(Message.timestamp.desc()).offset(1).limit(5).all()
@@ -262,11 +270,11 @@ def ask_question():
         history_text = "\n".join([f"{'Kullanıcı' if m.role == 'user' else 'Asistan'}: {m.content}" for m in history_msgs])
         
         # 3. Prompt
-        prompt = "Sen yardımcı bir doküman asistanısın. Aşağıdaki bağlam ve geçmiş konuşmaları dikkate alarak son soruyu cevapla.\n\n"
+        prompt = "Sen yardımcı bir doküman asistanısın. Eğer aşağıda doküman parçaları verilmişse öncelikle onlara sadık kalarak cevapla. Eğer doküman seçilmediği belirtilmişse genel bilginle yardımcı ol.\n\n"
         if history_text:
             prompt += f"--- Önceki Yazışmalar ---\n{history_text}\n\n"
         
-        prompt += f"--- İlgili Doküman Parçaları ---\n{context_text}\n\n"
+        prompt += f"--- Doküman Bağlamı ---\n{context_text}\n\n"
         prompt += f"Soru: {query}\n\nCevap:"
 
         # 4. Generate with user-specific settings if available
@@ -834,7 +842,7 @@ def vector_search():
         query_emb = embedding_client.get_embedding(query)
         # Search with user_id context to secure isolation
         search_user_id = None if current_user.is_admin else current_user.id
-        search_results = vector_db.query(query_emb, n_results=n_results, source=source, user_id=search_user_id)
+        search_results = vector_db.query(query_emb, n_results=n_results, source=source, user_id=search_user_id, query_text=query)
         
         results = []
         if search_results and search_results['ids']:

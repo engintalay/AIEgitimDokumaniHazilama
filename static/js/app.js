@@ -51,6 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function startNewChat() {
         currentChatId = null;
+        selectedSources = []; // Clear selection for new chat
+        console.log("Chat reset: selectedSources cleared.");
         chatWindow.innerHTML = `
             <div class="message bot-message">
                 <div class="message-content">
@@ -59,6 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         document.querySelectorAll('.history-item').forEach(i => i.classList.remove('active'));
+        updateActiveDocUI();
+        updateStats(); // Refresh sidebar selection
     }
 
     async function fetchHistory() {
@@ -479,7 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const privacyTitle = source.is_public ? 'Herkes görebilir' : 'Sadece siz';
 
             let actionHtml = `
-                <a href="/vector_explorer?source=${encodeURIComponent(source.name)}" target="_blank" class="view-vector-btn" title="Vektörleri Görüntüle / Ara" style="text-decoration:none;">👁️</a>
+                <button onclick="window.openVectorModal('${source.name}')" class="view-vector-btn" title="Vektörleri Görüntüle / Ara" style="background: none; border: none; cursor: pointer; padding: 5px; font-size: inherit;">👁️</button>
             `;
             if (source.is_owner) {
                 actionHtml += `
@@ -564,7 +568,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (data.error) alert(data.error);
             else {
-                if (selectedSource === source) selectedSource = null;
+                if (selectedSources.includes(source)) {
+                    selectedSources = selectedSources.filter(s => s !== source);
+                }
                 addMessage('bot', `🗑️ ${source} başarıyla silindi.`);
                 updateStats();
             }
@@ -845,3 +851,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 });
+
+// --- API Error / Cache Handling Logic ---
+window.openVectorModal = function (sourceName) {
+    const modal = document.getElementById('vector-modal');
+    const iframe = document.getElementById('vector-iframe');
+    if (modal && iframe) {
+        iframe.src = `/vector_explorer?source=${encodeURIComponent(sourceName)}&embed=true`;
+        modal.classList.add('active');
+    }
+};
+
+window.closeVectorModal = function () {
+    const modal = document.getElementById('vector-modal');
+    const iframe = document.getElementById('vector-iframe');
+    if (modal && iframe) {
+        iframe.src = '';
+        modal.classList.remove('active');
+    }
+};

@@ -320,6 +320,15 @@
             loadVectorData(0);
         }
 
+        if (new URLSearchParams(window.location.search).get('embed') === 'true') {
+            const header = document.querySelector('.nav-header');
+            if (header) header.style.display = 'none';
+            const container = document.querySelector('.admin-container');
+            if (container) {
+                container.style.padding = '10px';
+                container.style.maxWidth = '100%';
+            }
+        }
         init();
     </script>
 </body>

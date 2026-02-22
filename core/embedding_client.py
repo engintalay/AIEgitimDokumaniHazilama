@@ -53,15 +53,29 @@ class EmbeddingClient:
 
     def _get_ollama_embedding(self, text: str) -> List[float]:
         """Call Ollama embedding API."""
-        url = f"{self.endpoint}/api/embeddings"
+        # Use newer /api/embed endpoint which is more robust
+        url = f"{self.endpoint}/api/embed"
         payload = {
             "model": self.model,
-            "prompt": text
+            "input": text
         }
         try:
             response = requests.post(url, json=payload, timeout=30)
+            if response.status_code == 404:
+                # Fallback to legacy /api/embeddings
+                url_legacy = f"{self.endpoint}/api/embeddings"
+                payload_legacy = {"model": self.model, "prompt": text}
+                response = requests.post(url_legacy, json=payload_legacy, timeout=30)
+                response.raise_for_status()
+                return response.json()["embedding"]
+            
             response.raise_for_status()
-            return response.json()["embedding"]
+            data = response.json()
+            # /api/embed returns "embeddings": [[...]]
+            if "embeddings" in data:
+                return data["embeddings"][0]
+            # fallback for some versions
+            return data["embedding"]
         except Exception as e:
             raise RuntimeError(f"Ollama embedding failed: {str(e)}")
 

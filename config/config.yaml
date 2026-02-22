@@ -43,5 +43,7 @@ progress:
 rag:
   collection_name: training_docs
   db_path: ./data/vector_db
-  embedding_model: text-embedding-nomic-embed-text-v1.5
+  embedding_provider: ollama
+  embedding_endpoint: http://127.0.0.1:11434
+  embedding_model: nomic-embed-text
   top_k: 2

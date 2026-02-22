@@ -22,7 +22,7 @@ class VectorDB:
             ids=ids
         )
 
-    def query(self, query_embedding: List[float], n_results: int = 3, user_id: Optional[int] = None, source: Optional[Union[str, List[str]]] = None) -> Dict[str, Any]:
+    def query(self, query_embedding: List[float], n_results: int = 3, user_id: Optional[int] = None, source: Optional[Union[str, List[str]]] = None, query_text: Optional[str] = None) -> Dict[str, Any]:
         """Search for most similar documents with ownership and optional source filtering."""
         filters = []
         
@@ -52,11 +52,55 @@ class VectorDB:
             where = None
             
         try:
+            # 1. Semantic Vector Search
             results = self.collection.query(
                 query_embeddings=[query_embedding],
                 n_results=n_results,
                 where=where
             )
+
+            # Filter by distance threshold (e.g. 0.8) to avoid totally irrelevant matches
+            DISTANCE_THRESHOLD = 0.8
+            if results and results['ids'] and results['ids'][0]:
+                filtered_ids = []
+                filtered_docs = []
+                filtered_metas = []
+                filtered_distances = []
+                
+                for i in range(len(results['ids'][0])):
+                    dist = results['distances'][0][i] if 'distances' in results and results['distances'] else 0.0
+                    if dist <= DISTANCE_THRESHOLD:
+                        filtered_ids.append(results['ids'][0][i])
+                        filtered_docs.append(results['documents'][0][i])
+                        filtered_metas.append(results['metadatas'][0][i])
+                        filtered_distances.append(dist)
+                
+                results['ids'][0] = filtered_ids
+                results['documents'][0] = filtered_docs
+                results['metadatas'][0] = filtered_metas
+                if 'distances' in results:
+                    results['distances'][0] = filtered_distances
+
+            # 2. Keyword Fallback (if query_text provided and contains specific patterns or results are weak)
+            # Or just always do it for robustness if query_text is short enough or specific
+            if query_text and len(query_text) > 3:
+                keyword_results = self.collection.get(
+                    where=where,
+                    where_document={"$contains": query_text},
+                    limit=n_results
+                )
+                
+                if keyword_results and keyword_results['ids']:
+                    # Merge keyword results into semantic results
+                    existing_ids = set(results['ids'][0])
+                    for i, doc_id in enumerate(keyword_results['ids']):
+                        if doc_id not in existing_ids:
+                            results['ids'][0].append(doc_id)
+                            results['documents'][0].append(keyword_results['documents'][i])
+                            results['metadatas'][0].append(keyword_results['metadatas'][i])
+                            if 'distances' in results and results['distances']:
+                                results['distances'][0].append(0.0) # Assume high similarity for exact match
+                            
             return results
         except Exception as e:
             import logging
