@@ -131,8 +131,9 @@ class LMStudioClient(AIClient):
         
         try:
             import json
-            # Using context manager for automatic closure
+            logger.info(f"📡 LM Studio request sent: {url}")
             with requests.post(url, json=payload, timeout=self.timeout, stream=True) as response:
+                logger.info(f"📡 LM Studio response status: {response.status_code}")
                 response.raise_for_status()
                 
                 for line in response.iter_lines():
@@ -149,11 +150,14 @@ class LMStudioClient(AIClient):
                                 if chunk_text:
                                     yield {"type": "content", "text": chunk_text}
                                     
-                                if 'usage' in data:
-                                    yield {"type": "usage", "usage": data['usage']}
+                                # LM Studio streaming API does not typically return usage in delta chunks
+                                # if 'usage' in data:
+                                #     yield {"type": "usage", "usage": data['usage']}
                             except json.JSONDecodeError:
+                                # If a line is not valid JSON, skip it and continue
                                 continue
-        except Exception as e:
+                # logger.info(f"📡 Metadata yielded to stream.") # This line was removed as it was misleading
+        except Exception as e: # Changed 'ge' to 'e' for consistency
             logger.error(f"LM Studio streaming failed: {str(e)}")
             yield {"type": "error", "message": str(e)}
         finally:

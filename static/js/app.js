@@ -435,22 +435,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
             removeMessage(loadingMsg);
 
+            if (!response.ok) {
+                if (response.status === 504) {
+                    addMessage('bot', '❌ İstek zaman aşımına uğradı (Sunucu meşgul). Lütfen tekrar deneyin.');
+                } else if (response.status === 500) {
+                    addMessage('bot', '❌ Sunucu hatası (500). Arka planda bir sorun oluştu.');
+                } else {
+                    addMessage('bot', `❌ Sunucu hatası (${response.status}).`);
+                }
+                return;
+            }
+
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let botMsgDiv = null;
             let fullText = "";
             let metadata = null;
+            let buffer = ""; // Buffer for partial lines
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
                 const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n');
+                buffer += chunk;
+
+                const lines = buffer.split('\n');
+                // Keep the last partial line in the buffer
+                buffer = lines.pop();
 
                 for (const line of lines) {
-                    if (!line.startsWith('data: ')) continue;
-                    const jsonStr = line.replace('data: ', '').trim();
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine.startsWith('data: ')) continue;
+
+                    const jsonStr = trimmedLine.replace('data: ', '').trim();
                     if (!jsonStr) continue;
 
                     try {
@@ -468,21 +486,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             chatWindow.scrollTop = chatWindow.scrollHeight;
                         } else if (data.type === 'final') {
                             if (botMsgDiv) {
-                                // Add stats and actions
-                                const statsHtml = `
-                                    <div class="message-stats">
-                                        <span class="stat-item" title="Cevap Süresi">⏱️ ${data.stats.time}s</span>
-                                        <span class="stat-item" title="Prompt Token">📥 ${data.stats.prompt_tokens}</span>
-                                        <span class="stat-item" title="Cevap Token">📤 ${data.stats.completion_tokens}</span>
-                                    </div>
-                                `;
-                                const actionHtml = `
-                                    <div class="message-actions">
-                                        <button class="action-btn report-btn" title="Hata Bildir">🚩</button>
-                                        <button class="action-btn copy-btn" title="Metni Kopyala">📋</button>
-                                    </div>
-                                `;
-                                botMsgDiv.innerHTML += statsHtml + actionHtml;
+                                // Update stats and ID
+                                if (data.message_id) botMsgDiv.dataset.messageId = data.message_id;
+                                if (data.stats) {
+                                    const statsHtml = `<div class="message-stats">⏱️ ${data.stats.time}s | 💡 ${data.stats.prompt_tokens + data.stats.completion_tokens} token</div>`;
+                                    botMsgDiv.insertAdjacentHTML('beforeend', statsHtml);
+                                }
                                 finalizeMessageActions(botMsgDiv, 'bot', fullText, data.message_id);
 
                                 if (!currentChatId && data.chat_id) {

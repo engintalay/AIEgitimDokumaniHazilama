@@ -256,6 +256,7 @@ def ask_question():
         contexts = []
         metadatas = []
         context_text = ""
+        reference_details = [] # Initialized to handle general mode
         
         if sources:
             logger.info(f"📂 Seçili kaynaklar: {sources}")
@@ -323,22 +324,40 @@ def ask_question():
         user_settings = json.loads(current_user.settings) if current_user.settings else {}
         model_overrides = user_settings.get('model', {})
         
+        # Prepare all data for generator to avoid detached instance issues
         start_time = time.time()
+        chat_id_val = active_chat.id
+        user_id_val = current_user.id
         
         def stream_generator():
+            logger.info(f"📡 Stream generator started for Chat:{chat_id_val} User:{user_id_val}")
             full_text = ""
             current_usage = {"prompt_tokens": 0, "completion_tokens": 0}
             
             # 1. Send initial metadata (references)
-            yield f"data: {json.dumps({'type': 'metadata', 'ref_prefix': ref_prefix, 'reference_details': reference_details if 'reference_details' in locals() else []})}\n\n"
+            try:
+                meta_payload = {
+                    'type': 'metadata', 
+                    'ref_prefix': ref_prefix, 
+                    'reference_details': reference_details
+                }
+                yield f"data: {json.dumps(meta_payload)}\n\n"
+                logger.info(f"📡 Metadata yielded to stream for Chat:{chat_id_val}")
+            except Exception as ge:
+                logger.error(f"📡 Generator initialization error: {str(ge)}")
+                return
             
             try:
                 # 2. Get stream from AI client
+                chunk_count = 0
                 for chunk in ai_client.generate_stream(prompt, options=model_overrides):
                     if chunk['type'] == 'content':
                         text = chunk['text']
                         full_text += text
+                        chunk_count += 1
                         yield f"data: {json.dumps({'type': 'content', 'text': text})}\n\n"
+                        if chunk_count % 10 == 0:
+                            logger.info(f"📡 Yielded {chunk_count} chunks to Chat:{chat_id_val}")
                     elif chunk['type'] == 'usage':
                         current_usage = chunk['usage']
                     elif chunk['type'] == 'error':
@@ -350,27 +369,30 @@ def ask_question():
                 final_answer = ref_prefix + full_text
                 
                 with app.app_context():
-                    bot_msg = Message(
-                        chat_id=active_chat.id, 
-                        role='bot', 
-                        content=final_answer,
-                        response_time=generation_time,
-                        prompt_tokens=current_usage.get('prompt_tokens', 0),
-                        completion_tokens=current_usage.get('completion_tokens', 0)
-                    )
-                    sources_list = list(set(m['source'] for m in metadatas)) if contexts else []
-                    bot_msg.set_sources(sources_list)
-                    if 'reference_details' in locals():
+                    try:
+                        bot_msg = Message(
+                            chat_id=chat_id_val, 
+                            role='bot', 
+                            content=final_answer,
+                            response_time=generation_time,
+                            prompt_tokens=current_usage.get('prompt_tokens', 0),
+                            completion_tokens=current_usage.get('completion_tokens', 0)
+                        )
+                        sources_list = list(set(m['source'] for m in metadatas)) if contexts else []
+                        bot_msg.set_sources(sources_list)
                         bot_msg.set_reference_details(reference_details)
-                    
-                    db.session.add(bot_msg)
-                    db.session.commit()
-                    
-                    # 4. Send final stats and IDs
-                    yield f"data: {json.dumps({'type': 'final', 'chat_id': active_chat.id, 'message_id': bot_msg.id, 'stats': {'time': round(generation_time, 2), 'prompt_tokens': current_usage.get('prompt_tokens', 0), 'completion_tokens': current_usage.get('completion_tokens', 0)}})}\n\n"
+                        
+                        db.session.add(bot_msg)
+                        db.session.commit()
+                        
+                        # 4. Send final stats and IDs
+                        yield f"data: {json.dumps({'type': 'final', 'chat_id': chat_id_val, 'message_id': bot_msg.id, 'stats': {'time': round(generation_time, 2), 'prompt_tokens': current_usage.get('prompt_tokens', 0), 'completion_tokens': current_usage.get('completion_tokens', 0)}})}\n\n"
+                    except Exception as db_err:
+                        logger.exception(f"📡 Database error in stream: {str(db_err)}")
+                        yield f"data: {json.dumps({'type': 'error', 'message': 'Database save failed'})}\n\n"
                 
             except Exception as e:
-                logger.error(f"Stream error: {str(e)}")
+                logger.exception(f"📡 Stream generator fatal error: {str(e)}")
                 yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
         return Response(stream_generator(), mimetype='text/event-stream')
