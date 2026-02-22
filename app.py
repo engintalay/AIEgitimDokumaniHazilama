@@ -272,9 +272,15 @@ def ask_question():
         user_settings = json.loads(current_user.settings) if current_user.settings else {}
         model_overrides = user_settings.get('model', {})
         
-        # We pass model options to support per-user settings
         start_time = time.time()
-        result_data = ai_client.generate(prompt, options=model_overrides) 
+        try:
+            # We pass model options to support per-user settings
+            result_data = ai_client.generate(prompt, options=model_overrides) 
+        except Exception as e:
+            logger.warning(f"User model generation failed ({str(e)}), falling back to system default settings.")
+            # Fallback to default properties by ignoring user overrides
+            result_data = ai_client.generate(prompt)
+            
         generation_time = time.time() - start_time
         
         answer = result_data['text']

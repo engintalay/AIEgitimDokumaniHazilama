@@ -45,12 +45,18 @@ class VectorDB:
         else:
             where = None
             
-        results = self.collection.query(
-            query_embeddings=[query_embedding],
-            n_results=n_results,
-            where=where
-        )
-        return results
+        try:
+            results = self.collection.query(
+                query_embeddings=[query_embedding],
+                n_results=n_results,
+                where=where
+            )
+            return results
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"VectorDB query error (likely empty $or match): {str(e)}")
+            return {"documents": [[]], "metadatas": [[]], "distances": [[]]}
 
     def get_collection_count(self) -> int:
         """Return total document count in collection."""

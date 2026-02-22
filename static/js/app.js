@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             chatWindow.innerHTML = '';
             data.messages.forEach(msg => {
-                addMessage(msg.role, msg.content, false, msg.sources, msg.id);
+                addMessage(msg.role, msg.content, false, msg.sources, msg.id, msg.stats);
             });
 
             fetchHistory(); // Refresh to update active state
@@ -371,6 +371,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Handle Chat
+    let currentAbortController = null;
+
     sendBtn.addEventListener('click', sendMessage);
     userInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -388,13 +390,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
         addMessage('user', query + (selectedSource ? ` (Dosya: ${selectedSource})` : ''));
 
-        const loadingMsg = addMessage('bot', 'Düşünüyorum...', true);
+        const loadingMsg = addMessage('bot', `
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <span>Düşünüyorum...</span>
+                <button class="action-btn stop-btn" style="color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; background: rgba(239, 68, 68, 0.1);">🛑 Durdur</button>
+            </div>
+        `, true);
+
+        // Attach abort handler
+        currentAbortController = new AbortController();
+        const stopBtn = loadingMsg.querySelector('.stop-btn');
+        if (stopBtn) {
+            stopBtn.onclick = () => {
+                if (currentAbortController) {
+                    currentAbortController.abort();
+                    stopBtn.textContent = 'Durdu';
+                    stopBtn.disabled = true;
+                }
+            };
+        }
 
         try {
             const response = await fetch('/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query, source: selectedSource, chat_id: currentChatId })
+                body: JSON.stringify({ query, source: selectedSource, chat_id: currentChatId }),
+                signal: currentAbortController.signal
             });
 
             removeMessage(loadingMsg);
@@ -421,8 +442,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (err) {
             removeMessage(loadingMsg);
-            console.error('Send message error:', err);
-            addMessage('bot', '❌ Sunucuya erişilemedi. Lütfen internet bağlantınızı kontrol edin.');
+            if (err.name === 'AbortError') {
+                console.log('Fetch aborted by user.');
+                addMessage('bot', '🛑 <i>İşlem kullanıcı tarafından durduruldu.</i>');
+            } else {
+                console.error('Send message error:', err);
+                addMessage('bot', '❌ Sunucuya erişilemedi. Lütfen internet bağlantınızı kontrol edin.');
+            }
+        } finally {
+            currentAbortController = null;
         }
     }
 
@@ -591,8 +619,22 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         }
 
+        // Format <think> blocks as collapsible details elements
+        let processedText = text;
+        const thinkRegex = /<think>([\s\S]*?)<\/think>/g;
+        if (processedText.match(thinkRegex)) {
+            processedText = processedText.replace(thinkRegex, (match, p1) => {
+                return `<details class="think-block"><summary>🧠 Düşünce Süreci</summary><div class="think-content">${p1.trim().replace(/\n/g, '<br>')}</div></details>`;
+            });
+        }
+
+        // Replace remaining newlines with <br> for regular text
+        processedText = processedText.replace(/\n/g, '<br>');
+
+        // Clean up nested <br> inside details if they clash (optional, keeping it simple for now as the inner text is already styled)
+
         let html = `
-            <div class="message-content">${text.replace(/\n/g, '<br>')}</div>
+            <div class="message-content">${processedText}</div>
             ${statsHtml}
             ${actionHtml}
         `;

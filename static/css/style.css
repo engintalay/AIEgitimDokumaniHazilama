@@ -1224,8 +1224,27 @@ textarea {
     }
 
     .message-content {
-        word-break: break-word !important;
+        line-height: 1.6;
+        word-break: break-word;
         overflow-wrap: break-word !important;
+    }
+
+    .message-content h3 {
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .message-content ul,
+    .message-content ol {
+        margin-left: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .sources {
+        padding: 1rem !important;
+        font-size: 0.95rem !important;
+        margin-bottom: 0.5rem !important;
+        background: rgba(255, 255, 255, 0.03) !important;
     }
 
     .input-area {
