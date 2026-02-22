@@ -32,6 +32,7 @@ class Message(db.Model):
     response_time = db.Column(db.Float) # In seconds
     prompt_tokens = db.Column(db.Integer)
     completion_tokens = db.Column(db.Integer)
+    reference_details = db.Column(db.Text) # JSON string of list of dicts
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_sources(self, sources_list):
@@ -39,6 +40,12 @@ class Message(db.Model):
 
     def get_sources(self):
         return json.loads(self.sources) if self.sources else []
+
+    def set_reference_details(self, details_list):
+        self.reference_details = json.dumps(details_list)
+
+    def get_reference_details(self):
+        return json.loads(self.reference_details) if self.reference_details else []
 
 class Report(db.Model):
     id = db.Column(db.Integer, primary_key=True)

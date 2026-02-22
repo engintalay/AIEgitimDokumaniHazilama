@@ -101,6 +101,64 @@ class LMStudioClient(AIClient):
             logger.error(f"LM Studio generation failed: {str(e)}")
             raise RuntimeError(f"LM Studio generation failed: {str(e)}")
     
+    def generate_stream(self, prompt: str, options: Dict[str, Any] = None):
+        """Generate streaming response from LM Studio."""
+        options = options or {}
+        endpoint = options.get('endpoint', self.endpoint) or self.endpoint
+        url = f"{endpoint}/v1/chat/completions"
+        model = options.get('name', self.model_name) or self.model_name
+        
+        try:
+            temp = float(options.get('temperature', self.temperature))
+            tokens = int(options.get('max_tokens', self.max_tokens))
+        except:
+            temp = self.temperature
+            tokens = self.max_tokens
+
+        messages = []
+        if self.use_system_prompt and self.system_prompt:
+            messages.append({"role": "user", "content": f"{self.system_prompt}\n\n{prompt}"})
+        else:
+            messages.append({"role": "user", "content": prompt})
+        
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temp,
+            "max_tokens": tokens,
+            "stream": True # Enable streaming
+        }
+        
+        try:
+            import json
+            # Using context manager for automatic closure
+            with requests.post(url, json=payload, timeout=self.timeout, stream=True) as response:
+                response.raise_for_status()
+                
+                for line in response.iter_lines():
+                    if line:
+                        line_text = line.decode('utf-8')
+                        if line_text.startswith('data: '):
+                            data_str = line_text[6:].strip()
+                            if data_str == '[DONE]':
+                                break
+                            
+                            try:
+                                data = json.loads(data_str)
+                                chunk_text = data['choices'][0]['delta'].get('content', '')
+                                if chunk_text:
+                                    yield {"type": "content", "text": chunk_text}
+                                    
+                                if 'usage' in data:
+                                    yield {"type": "usage", "usage": data['usage']}
+                            except json.JSONDecodeError:
+                                continue
+        except Exception as e:
+            logger.error(f"LM Studio streaming failed: {str(e)}")
+            yield {"type": "error", "message": str(e)}
+        finally:
+            logger.info("LM Studio stream generator closed.")
+
     def is_available(self) -> bool:
         """Check if LM Studio is running."""
         try:

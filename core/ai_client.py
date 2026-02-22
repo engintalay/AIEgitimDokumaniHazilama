@@ -26,6 +26,13 @@ class AIClient(ABC):
         Returns: {"text": str, "usage": {"prompt_tokens": int, "completion_tokens": int}}
         """
         pass
+
+    @abstractmethod
+    def generate_stream(self, prompt: str, options: Dict[str, Any] = None):
+        """Generate streaming response from AI model.
+        Returns a generator of text chunks.
+        """
+        pass
     
     @abstractmethod
     def is_available(self) -> bool:

@@ -10,7 +10,7 @@ load_dotenv()
 import logging
 import time
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory, Response
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_from_directory, Response
 import json
 from werkzeug.utils import secure_filename
 from core.document_parser import DocumentParser
@@ -140,6 +140,14 @@ def auth_callback():
 def logout():
     logout_user()
     return redirect(url_for('index'))
+
+@app.route('/manifest.json')
+def serve_manifest():
+    return send_from_directory('static', 'manifest.json')
+
+@app.route('/sw.js')
+def serve_sw():
+    return send_from_directory('static', 'sw.js')
 
 @app.route('/upload', methods=['POST'])
 @login_required
@@ -316,49 +324,59 @@ def ask_question():
         model_overrides = user_settings.get('model', {})
         
         start_time = time.time()
-        try:
-            # We pass model options to support per-user settings
-            result_data = ai_client.generate(prompt, options=model_overrides) 
-        except Exception as e:
-            logger.warning(f"User model generation failed ({str(e)}), falling back to system default settings.")
-            # Fallback to default properties by ignoring user overrides
-            result_data = ai_client.generate(prompt)
+        
+        def stream_generator():
+            full_text = ""
+            current_usage = {"prompt_tokens": 0, "completion_tokens": 0}
             
-        generation_time = time.time() - start_time
-        
-        answer = ref_prefix + result_data['text']
-        usage = result_data.get('usage', {})
-        
-        # Save bot message
-        bot_msg = Message(
-            chat_id=active_chat.id, 
-            role='bot', 
-            content=answer,
-            response_time=generation_time,
-            prompt_tokens=usage.get('prompt_tokens', 0),
-            completion_tokens=usage.get('completion_tokens', 0)
-        )
-        sources_list = list(set(m['source'] for m in metadatas)) if contexts else []
-        bot_msg.set_sources(sources_list)
-        db.session.add(bot_msg)
-        db.session.commit()
-        
-        return jsonify({
-            "answer": answer,
-            "sources": sources_list,
-            "reference_details": reference_details if 'reference_details' in locals() else [],
-            "chat_id": active_chat.id,
-            "chat_title": active_chat.title,
-            "message_id": bot_msg.id,
-            "stats": {
-                "time": round(generation_time, 2),
-                "prompt_tokens": usage.get('prompt_tokens', 0),
-                "completion_tokens": usage.get('completion_tokens', 0)
-            }
-        })
-        
+            # 1. Send initial metadata (references)
+            yield f"data: {json.dumps({'type': 'metadata', 'ref_prefix': ref_prefix, 'reference_details': reference_details if 'reference_details' in locals() else []})}\n\n"
+            
+            try:
+                # 2. Get stream from AI client
+                for chunk in ai_client.generate_stream(prompt, options=model_overrides):
+                    if chunk['type'] == 'content':
+                        text = chunk['text']
+                        full_text += text
+                        yield f"data: {json.dumps({'type': 'content', 'text': text})}\n\n"
+                    elif chunk['type'] == 'usage':
+                        current_usage = chunk['usage']
+                    elif chunk['type'] == 'error':
+                        yield f"data: {json.dumps({'type': 'error', 'message': chunk['message']})}\n\n"
+                        return
+
+                # 3. Finalize and save to DB
+                generation_time = time.time() - start_time
+                final_answer = ref_prefix + full_text
+                
+                with app.app_context():
+                    bot_msg = Message(
+                        chat_id=active_chat.id, 
+                        role='bot', 
+                        content=final_answer,
+                        response_time=generation_time,
+                        prompt_tokens=current_usage.get('prompt_tokens', 0),
+                        completion_tokens=current_usage.get('completion_tokens', 0)
+                    )
+                    sources_list = list(set(m['source'] for m in metadatas)) if contexts else []
+                    bot_msg.set_sources(sources_list)
+                    if 'reference_details' in locals():
+                        bot_msg.set_reference_details(reference_details)
+                    
+                    db.session.add(bot_msg)
+                    db.session.commit()
+                    
+                    # 4. Send final stats and IDs
+                    yield f"data: {json.dumps({'type': 'final', 'chat_id': active_chat.id, 'message_id': bot_msg.id, 'stats': {'time': round(generation_time, 2), 'prompt_tokens': current_usage.get('prompt_tokens', 0), 'completion_tokens': current_usage.get('completion_tokens', 0)}})}\n\n"
+                
+            except Exception as e:
+                logger.error(f"Stream error: {str(e)}")
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+        return Response(stream_generator(), mimetype='text/event-stream')
+
     except Exception as e:
-        logger.error(f"❌ Hata: {str(e)}")
+        logger.error(f"❌ Soru sorma hatası: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/chats', methods=['GET', 'POST'])
@@ -392,7 +410,8 @@ def chat_detail(chat_id):
                 "role": m.role,
                 "content": m.content,
                 "sources": m.get_sources(),
-                "timestamp": m.timestamp.isoformat(),
+                "reference_details": m.get_reference_details() if hasattr(m, 'get_reference_details') else [],
+                "timestamp": m.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                 "id": m.id,
                 "stats": {
                     "time": round(m.response_time, 2) if m.response_time else None,

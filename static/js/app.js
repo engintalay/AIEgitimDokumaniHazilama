@@ -1,4 +1,15 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then(registration => {
+                console.log('SW registered:', registration);
+            }).catch(error => {
+                console.log('SW registration failed:', error);
+            });
+        });
+    }
+
     const chatWindow = document.getElementById('chat-window');
     const userInput = document.getElementById('user-input');
     const sendBtn = document.getElementById('send-btn');
@@ -424,24 +435,67 @@ document.addEventListener('DOMContentLoaded', () => {
 
             removeMessage(loadingMsg);
 
-            if (!response.ok) {
-                if (response.status === 504) {
-                    addMessage('bot', '❌ İstek zaman aşımına uğradı (Sunucu çok meşgul veya cevap çok uzun sürdü). Lütfen birazdan tekrar deneyin.');
-                } else {
-                    addMessage('bot', `❌ Sunucu hatası (${response.status}). Lütfen daha sonra tekrar deneyin.`);
-                }
-                return;
-            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let botMsgDiv = null;
+            let fullText = "";
+            let metadata = null;
 
-            const data = await response.json();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
 
-            if (data.error) {
-                addMessage('bot', `❌ Hata: ${data.error}`);
-            } else {
-                addMessage('bot', data.answer, false, data.sources, data.message_id, data.stats, data.reference_details);
-                if (!currentChatId && data.chat_id) {
-                    currentChatId = data.chat_id;
-                    fetchHistory();
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const jsonStr = line.replace('data: ', '').trim();
+                    if (!jsonStr) continue;
+
+                    try {
+                        const data = JSON.parse(jsonStr);
+                        if (data.type === 'metadata') {
+                            metadata = data;
+                            botMsgDiv = addMessage('bot', data.ref_prefix, false, [], null, null, data.reference_details);
+                            fullText = data.ref_prefix;
+                        } else if (data.type === 'content') {
+                            if (!botMsgDiv) {
+                                botMsgDiv = addMessage('bot', '', false);
+                            }
+                            fullText += data.text;
+                            botMsgDiv.innerHTML = formatContent(fullText, metadata ? metadata.reference_details : []);
+                            chatWindow.scrollTop = chatWindow.scrollHeight;
+                        } else if (data.type === 'final') {
+                            if (botMsgDiv) {
+                                // Add stats and actions
+                                const statsHtml = `
+                                    <div class="message-stats">
+                                        <span class="stat-item" title="Cevap Süresi">⏱️ ${data.stats.time}s</span>
+                                        <span class="stat-item" title="Prompt Token">📥 ${data.stats.prompt_tokens}</span>
+                                        <span class="stat-item" title="Cevap Token">📤 ${data.stats.completion_tokens}</span>
+                                    </div>
+                                `;
+                                const actionHtml = `
+                                    <div class="message-actions">
+                                        <button class="action-btn report-btn" title="Hata Bildir">🚩</button>
+                                        <button class="action-btn copy-btn" title="Metni Kopyala">📋</button>
+                                    </div>
+                                `;
+                                botMsgDiv.innerHTML += statsHtml + actionHtml;
+                                finalizeMessageActions(botMsgDiv, 'bot', fullText, data.message_id);
+
+                                if (!currentChatId && data.chat_id) {
+                                    currentChatId = data.chat_id;
+                                    fetchHistory();
+                                }
+                            }
+                        } else if (data.type === 'error') {
+                            addMessage('bot', `❌ Hata: ${data.message}`);
+                        }
+                    } catch (e) {
+                        console.error('SSE parse error:', e, jsonStr);
+                    }
                 }
             }
         } catch (err) {
@@ -597,50 +651,17 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    function addMessage(role, text, isLoading = false, sources = [], messageId = null, stats = null, referenceDetails = []) {
-        const div = document.createElement('div');
-        div.className = `message ${role}-message`;
-
-        let actionHtml = '';
-        if (role === 'user' && !isLoading) {
-            actionHtml = `
-                <div class="message-actions">
-                    <button class="action-btn copy-btn" title="Kopyala">📋</button>
-                    <button class="action-btn rerun-btn" title="Tekrar Çalıştır">🔄</button>
-                </div>
-            `;
-        } else if (role === 'bot' && !isLoading) {
-            actionHtml = `
-                <div class="message-actions">
-                    <button class="action-btn report-btn" title="Hata Bildir">🚩</button>
-                    <button class="action-btn copy-btn" title="Metni Kopyala">📋</button>
-                </div>
-            `;
-        }
-
-        let statsHtml = '';
-        if (role === 'bot' && !isLoading && stats) {
-            statsHtml = `
-                <div class="message-stats">
-                    <span class="stat-item" title="Cevap Süresi">⏱️ ${stats.time}s</span>
-                    <span class="stat-item" title="Prompt Token">📥 ${stats.prompt_tokens}</span>
-                    <span class="stat-item" title="Cevap Token">📤 ${stats.completion_tokens}</span>
-                </div>
-            `;
-        }
-
-        // Format <think> blocks as collapsible details elements
+    function formatContent(text, referenceDetails = []) {
         let processedText = text;
-        // Match <think>...</think> or <think>... until end of string (if interrupted)
         const thinkRegex = /<think>([\s\S]*?)(?:<\/think>|$)/gi;
         if (processedText.match(thinkRegex)) {
             processedText = processedText.replace(thinkRegex, (match, p1) => {
-                return `<details class="think-block"><summary>🧠 Düşünce Süreci</summary><div class="think-content">${p1.trim().replace(/\n/g, '<br>')}</div></details>`;
+                return `<details class="think-block" open><summary>🧠 Düşünce Süreci</summary><div class="think-content">${p1.trim().replace(/\n/g, '<br>')}</div></details>`;
             });
         }
 
         let referenceHtml = '';
-        if (role === 'bot' && !isLoading && referenceDetails && referenceDetails.length > 0) {
+        if (referenceDetails && referenceDetails.length > 0) {
             const refs = referenceDetails.map((ref, idx) => `
                 <div class="ref-item">
                     <div class="ref-header"><strong>Referans #${idx + 1}</strong> (${ref.source})</div>
@@ -655,53 +676,89 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         }
 
-        // Replace remaining newlines with <br> for regular text
         processedText = processedText.replace(/\n/g, '<br>');
-
-        // Clean up nested <br> inside details if they clash (optional, keeping it simple for now as the inner text is already styled)
-
-        let html = `
+        return `
             <div class="message-content">${processedText}</div>
             ${referenceHtml}
-            ${statsHtml}
-            ${actionHtml}
         `;
+    }
 
-        if (sources && sources.length > 0) {
-            html += `<div class="sources">Kaynaklar: ${sources.join(', ')}</div>`;
+    function addMessage(role, text, isLoading = false, sources = [], messageId = null, stats = null, referenceDetails = []) {
+        const div = document.createElement('div');
+        div.className = `message ${role}-message`;
+
+        if (isLoading) {
+            div.innerHTML = `<div class="message-content">${text}</div>`;
+            chatWindow.appendChild(div);
+            return div;
         }
 
-        div.innerHTML = html;
+        let html = formatContent(text, referenceDetails);
+
+        let statsHtml = '';
+        if (role === 'bot' && stats) {
+            statsHtml = `
+                <div class="message-stats">
+                    <span class="stat-item" title="Cevap Süresi">⏱️ ${stats.time}s</span>
+                    <span class="stat-item" title="Prompt Token">📥 ${stats.prompt_tokens}</span>
+                    <span class="stat-item" title="Cevap Token">📤 ${stats.completion_tokens}</span>
+                </div>
+            `;
+        }
+
+        let actionHtml = '';
+        if (role === 'user') {
+            actionHtml = `
+                <div class="message-actions">
+                    <button class="action-btn copy-btn" title="Kopyala">📋</button>
+                    <button class="action-btn rerun-btn" title="Tekrar Çalıştır">🔄</button>
+                </div>
+            `;
+        } else {
+            actionHtml = `
+                <div class="message-actions">
+                    <button class="action-btn report-btn" title="Hata Bildir">🚩</button>
+                    <button class="action-btn copy-btn" title="Metni Kopyala">📋</button>
+                </div>
+            `;
+        }
+
+        div.innerHTML = html + statsHtml + actionHtml;
+        if (sources && sources.length > 0) {
+            div.innerHTML += `<div class="sources">Kaynaklar: ${sources.join(', ')}</div>`;
+        }
+
         chatWindow.appendChild(div);
         chatWindow.scrollTop = chatWindow.scrollHeight;
-
-        // Add action listeners
-        if (!isLoading) {
-            if (role === 'user') {
-                const cleanText = text.includes(' (Dosya:') ? text.split(' (Dosya:')[0] : text;
-                div.querySelector('.copy-btn').onclick = () => {
-                    userInput.value = cleanText;
-                    userInput.focus();
-                    userInput.dispatchEvent(new Event('input')); // Trigger auto-resize
-                };
-                div.querySelector('.rerun-btn').onclick = () => {
-                    userInput.value = cleanText;
-                    sendMessage();
-                };
-            } else if (role === 'bot') {
-                div.querySelector('.copy-btn').onclick = () => {
-                    navigator.clipboard.writeText(text);
-                    const originalText = div.querySelector('.copy-btn').textContent;
-                    div.querySelector('.copy-btn').textContent = '✅';
-                    setTimeout(() => div.querySelector('.copy-btn').textContent = originalText, 1000);
-                };
-                div.querySelector('.report-btn').onclick = () => {
-                    openReportModal(messageId);
-                };
-            }
-        }
-
+        finalizeMessageActions(div, role, text, messageId);
         return div;
+    }
+
+    function finalizeMessageActions(div, role, text, messageId) {
+        if (role === 'user') {
+            const cleanText = text.includes(' (Dosya:') ? text.split(' (Dosya:')[0] : text;
+            const copyBtn = div.querySelector('.copy-btn');
+            if (copyBtn) copyBtn.onclick = () => {
+                userInput.value = cleanText;
+                userInput.focus();
+                userInput.dispatchEvent(new Event('input'));
+            };
+            const rerunBtn = div.querySelector('.rerun-btn');
+            if (rerunBtn) rerunBtn.onclick = () => {
+                userInput.value = cleanText;
+                sendMessage();
+            };
+        } else {
+            const copyBtn = div.querySelector('.copy-btn');
+            if (copyBtn) copyBtn.onclick = () => {
+                navigator.clipboard.writeText(text);
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✅';
+                setTimeout(() => copyBtn.textContent = originalText, 1000);
+            };
+            const reportBtn = div.querySelector('.report-btn');
+            if (reportBtn) reportBtn.onclick = () => openReportModal(messageId);
+        }
     }
 
     // Reporting Logic

@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Eğitim Dokümanı Asistanı</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2.13">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0ea5e9">
+    <link rel="apple-touch-icon" href="/static/img/icon-192.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         /* Reference details styles */
@@ -22,28 +25,30 @@
             padding: 0.6rem 1rem;
             cursor: pointer;
             font-weight: 600;
-            color: var(--accent-primary);
+            color: var(--primary-color, #6366f1);
             user-select: none;
-            background: rgba(var(--accent-primary-rgb), 0.05);
+            background: rgba(99, 102, 241, 0.05);
+            /* Safe fallback */
             transition: background 0.2s;
         }
 
         .references-detail-block summary:hover {
-            background: rgba(var(--accent-primary-rgb), 0.1);
+            background: rgba(99, 102, 241, 0.1);
         }
 
         .references-container {
             padding: 0.5rem;
             max-height: 400px;
             overflow-y: auto;
+            background: rgba(0, 0, 0, 0.2);
         }
 
         .ref-item {
             margin-bottom: 0.75rem;
             padding: 0.75rem;
-            background: rgba(255, 255, 255, 0.02);
+            background: rgba(255, 255, 255, 0.05);
             border-radius: 6px;
-            border-left: 3px solid var(--accent-primary);
+            border-left: 3px solid var(--primary-color, #6366f1);
         }
 
         .ref-item:last-child {
