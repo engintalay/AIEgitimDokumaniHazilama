@@ -1,4 +1,5 @@
 import os
+import copy
 import yaml
 import uuid
 import time
@@ -459,7 +460,7 @@ def handle_config():
     if request.method == 'GET':
         user_settings = json.loads(current_user.settings) if current_user.settings else {}
         # Merge user settings into global config for the UI
-        full_cfg = config.copy()
+        full_cfg = copy.deepcopy(config)
         if 'model' in user_settings:
             full_cfg['model'].update(user_settings['model'])
         return jsonify(full_cfg)
@@ -536,7 +537,7 @@ def admin_user_config(user_id):
     
     if request.method == 'GET':
         user_settings = json.loads(target_user.settings) if target_user.settings else {}
-        full_cfg = config.copy()
+        full_cfg = copy.deepcopy(config)
         if 'model' in user_settings:
             full_cfg['model'].update(user_settings['model'])
         return jsonify(full_cfg)
