@@ -487,9 +487,19 @@ def get_available_models():
         endpoint = request.args.get('endpoint')
         
         if provider:
+            endpoint_val = endpoint.strip() if endpoint else ""
+            if not endpoint_val:
+                defaults = {
+                    "ollama": "http://localhost:11434",
+                    "lmstudio": "http://127.0.0.1:1234",
+                    "openai": "https://api.openai.com",
+                    "llamacpp": "http://127.0.0.1:8080"
+                }
+                endpoint_val = defaults.get(provider, "")
+                
             temp_cfg = {
                 "type": provider,
-                "endpoint": endpoint or ""
+                "endpoint": endpoint_val
             }
             temp_client = AIClientFactory.create(temp_cfg)
             models = temp_client.get_available_models()
