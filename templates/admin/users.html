@@ -113,6 +113,51 @@
         </div>
     </div>
 
+    <!-- User Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h2 id="settings-modal-title">Kullanıcı Ayarları</h2>
+                <button class="close-btn" onclick="closeSettings()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="settings-form">
+                    <input type="hidden" id="config-user-id">
+                    <div class="settings-group">
+                        <label>AI Sağlayıcı</label>
+                        <select name="type" id="config-model-type">
+                            <option value="ollama">Ollama</option>
+                            <option value="lmstudio">LM Studio</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="llamacpp">llama.cpp</option>
+                        </select>
+                    </div>
+                    <div class="settings-group">
+                        <label style="display: flex; justify-content: space-between; align-items: center;">
+                            AI Model
+                            <button type="button" onclick="fetchAvailableModels()" class="inline-refresh-btn"
+                                title="Modelleri Yenile"
+                                style="background: none; border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; border-radius: 4px; padding: 2px 5px; font-size: 0.8rem;">🔄
+                                Yenile</button>
+                        </label>
+                        <select name="name" id="config-model-name">
+                            <option value="">Yükleniyor...</option>
+                        </select>
+                    </div>
+                    <div class="settings-group">
+                        <label>API Endpoint</label>
+                        <input type="text" name="endpoint" id="config-endpoint"
+                            style="width: 100%; padding: 0.5rem; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 0.5rem;">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button onclick="saveSettings()" class="view-btn"
+                    style="background: #10b981; border: none; cursor: pointer;">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         async function loadUsers() {
             const response = await fetch('/admin/users_data');
@@ -135,6 +180,9 @@
                             <button onclick="toggleAdmin(${user.id})" class="view-btn" style="background: #6366f1;">
                                 ${user.is_admin ? 'Yetki Al' : 'Admin Yap'}
                             </button>
+                            <button onclick="openSettings(${user.id}, '${user.name}')" class="view-btn" style="background: #f59e0b; color: white;">
+                                ⚙️ Ayarlar
+                            </button>
                         </div>
                     </div>
                 `;
@@ -152,6 +200,91 @@
             } catch (err) {
                 console.error(err);
                 alert('İşlem başarısız.');
+            }
+        }
+
+        // --- Settings Management ---
+        const modal = document.getElementById('settings-modal');
+
+        function closeSettings() {
+            modal.classList.remove('active');
+        }
+
+        async function fetchAvailableModels() {
+            try {
+                const select = document.getElementById('config-model-name');
+                const prevVal = select.value;
+                select.innerHTML = '<option value="">Yükleniyor...</option>';
+
+                const response = await fetch('/available_models');
+                const data = await response.json();
+
+                select.innerHTML = '';
+                if (data.models && data.models.length > 0) {
+                    data.models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.id;
+                        option.textContent = model.name;
+                        select.appendChild(option);
+                    });
+                    if (prevVal) select.value = prevVal;
+                } else {
+                    select.innerHTML = '<option value="">Model bulunamadı</option>';
+                }
+            } catch (err) {
+                console.error('Failed to fetch models', err);
+                document.getElementById('config-model-name').innerHTML = '<option value="">Bağlantı Hatası</option>';
+            }
+        }
+
+        async function openSettings(userId, userName) {
+            document.getElementById('settings-modal-title').textContent = `${userName} Ayarları`;
+            document.getElementById('config-user-id').value = userId;
+
+            // Fetch current config for user
+            try {
+                await fetchAvailableModels(); // Load models dropdown first
+                const response = await fetch(`/admin/users/${userId}/config`);
+                const config = await response.json();
+
+                if (config.model) {
+                    if (config.model.type) document.getElementById('config-model-type').value = config.model.type;
+                    if (config.model.name) document.getElementById('config-model-name').value = config.model.name;
+                    if (config.model.endpoint) document.getElementById('config-endpoint').value = config.model.endpoint;
+                }
+                modal.classList.add('active');
+            } catch (err) {
+                console.error('Config fetch error:', err);
+                alert('Ayarlar yüklenemedi.');
+            }
+        }
+
+        async function saveSettings() {
+            const userId = document.getElementById('config-user-id').value;
+            const newConfig = {
+                model: {
+                    type: document.getElementById('config-model-type').value,
+                    name: document.getElementById('config-model-name').value,
+                    endpoint: document.getElementById('config-endpoint').value
+                }
+            };
+
+            try {
+                const response = await fetch(`/admin/users/${userId}/config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newConfig)
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    alert('Ayarlar başarıyla kaydedildi.');
+                    closeSettings();
+                } else {
+                    alert('Hata: ' + data.error);
+                }
+            } catch (err) {
+                console.error('Save failed', err);
+                alert('Ayarlar kaydedilemedi.');
             }
         }
 

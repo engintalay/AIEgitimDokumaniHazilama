@@ -621,7 +621,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Format <think> blocks as collapsible details elements
         let processedText = text;
-        const thinkRegex = /<think>([\s\S]*?)<\/think>/g;
+        // Match <think>...</think> or <think>... until end of string (if interrupted)
+        const thinkRegex = /<think>([\s\S]*?)(?:<\/think>|$)/gi;
         if (processedText.match(thinkRegex)) {
             processedText = processedText.replace(thinkRegex, (match, p1) => {
                 return `<details class="think-block"><summary>🧠 Düşünce Süreci</summary><div class="think-content">${p1.trim().replace(/\n/g, '<br>')}</div></details>`;

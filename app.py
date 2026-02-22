@@ -512,6 +512,33 @@ def admin_users_data():
         })
     return jsonify(user_list)
 
+@app.route('/admin/users/<int:user_id>/config', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_user_config(user_id):
+    target_user = User.query.get_or_404(user_id)
+    global config
+    
+    if request.method == 'GET':
+        user_settings = json.loads(target_user.settings) if target_user.settings else {}
+        full_cfg = config.copy()
+        if 'model' in user_settings:
+            full_cfg['model'].update(user_settings['model'])
+        return jsonify(full_cfg)
+    else:
+        try:
+            new_settings = request.json
+            target_user.settings = json.dumps({
+                "model": new_settings.get('model', {})
+            })
+            db.session.commit()
+            
+            logger.info(f"⚙️ Admin '{current_user.name}', Kullanıcı '{target_user.name}' ayarlarını güncelledi.")
+            return jsonify({"message": f"{target_user.name} kullanıcısının ayarları başarıyla kaydedildi."})
+        except Exception as e:
+            logger.error(f"Admin Config kaydetme hatası: {str(e)}")
+            return jsonify({"error": str(e)}), 500
+
 @app.route('/admin/user/<int:user_id>/chats')
 @login_required
 @admin_required
