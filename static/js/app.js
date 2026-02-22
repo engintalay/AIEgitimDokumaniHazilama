@@ -407,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const loadingMsg = addMessage('bot', `
             <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                <span>Düşünüyorum...</span>
+                <span><span class="spinner"></span> Düşünüyorum...</span>
                 <button class="action-btn stop-btn" style="color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; background: rgba(239, 68, 68, 0.1);">🛑 Durdur</button>
             </div>
         `, true);
@@ -433,9 +433,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 signal: currentAbortController.signal
             });
 
-            removeMessage(loadingMsg);
+            // Set a timeout to show warning if no data received for 10 seconds
+            let lastDataTime = Date.now();
+            let timeoutWarning = null;
+            const checkTimeout = setInterval(() => {
+                const elapsed = (Date.now() - lastDataTime) / 1000;
+                if (elapsed > 10 && !timeoutWarning) {
+                    const contentSpan = loadingMsg.querySelector('span:first-child');
+                    if (contentSpan && contentSpan.textContent.includes('Düşünüyorum')) {
+                        contentSpan.innerHTML = '<span class="spinner"></span> Model yanıt veriyor, lütfen bekleyin... (Bu işlem uzun sürebilir)';
+                        timeoutWarning = true;
+                    }
+                }
+            }, 2000);
+
+            // Keep the loading message as a placeholder until we receive the first content chunk
+            // It will be transformed into the bot message when streaming starts
 
             if (!response.ok) {
+                clearInterval(checkTimeout);
+                removeMessage(loadingMsg);
                 if (response.status === 504) {
                     addMessage('bot', '❌ İstek zaman aşımına uğradı (Sunucu meşgul). Lütfen tekrar deneyin.');
                 } else if (response.status === 500) {
@@ -473,14 +490,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     try {
                         const data = JSON.parse(jsonStr);
+                        lastDataTime = Date.now(); // Reset timeout counter
+                        
                         if (data.type === 'metadata') {
-                            metadata = data;
-                            botMsgDiv = addMessage('bot', data.ref_prefix, false, [], null, null, data.reference_details);
-                            fullText = data.ref_prefix;
-                        } else if (data.type === 'content') {
+                            // Use the loading placeholder as the bot message container
                             if (!botMsgDiv) {
-                                botMsgDiv = addMessage('bot', '', false);
+                                botMsgDiv = loadingMsg;
+                                // Keep stop button but update text to show we're waiting for response
+                                const contentSpan = botMsgDiv.querySelector('span:first-child');
+                                if (contentSpan) {
+                                    contentSpan.innerHTML = '<span class="spinner"></span> Cevap bekleniyor...';
+                                }
                             }
+                            // Store metadata but don't display yet - wait for first content
+                            metadata = data;
+                            fullText = data.ref_prefix || "";
+                        } else if (data.type === 'content') {
+                            // On first content chunk, replace the loading placeholder with the actual bot message
+                            if (!botMsgDiv) {
+                                // Reuse the loadingMsg element as the bot message container
+                                botMsgDiv = loadingMsg;
+                            }
+                            
+                            // Remove stop button on first content (if not already removed)
+                            const stopBtn = botMsgDiv.querySelector('.stop-btn');
+                            if (stopBtn) stopBtn.remove();
+                            
+                            // Add the new content
                             fullText += data.text;
                             botMsgDiv.innerHTML = formatContent(fullText, metadata ? metadata.reference_details : []);
                             chatWindow.scrollTop = chatWindow.scrollHeight;
@@ -507,6 +543,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             }
+            
+            clearInterval(checkTimeout); // Clean up timeout checker
         } catch (err) {
             removeMessage(loadingMsg);
             if (err.name === 'AbortError') {
