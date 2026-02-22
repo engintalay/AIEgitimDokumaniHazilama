@@ -47,6 +47,28 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentConfig = null;
     let currentChatId = null;
 
+    // Theme Management
+    function applyTheme(theme) {
+        if (theme === 'dark') {
+            document.documentElement.removeAttribute('data-theme');
+        } else {
+            document.documentElement.setAttribute('data-theme', theme);
+        }
+        localStorage.setItem('theme', theme);
+    }
+
+    // Load saved theme on startup
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    applyTheme(savedTheme);
+
+    // Theme change listener
+    const themeSelect = document.getElementById('config-theme');
+    if (themeSelect) {
+        themeSelect.onchange = (e) => {
+            applyTheme(e.target.value);
+        };
+    }
+
     // Initial load
     updateStats();
     fetchHistory();
@@ -904,6 +926,10 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('config-temp').value = m.temperature;
             document.getElementById('config-max-tokens').value = m.max_tokens;
             document.getElementById('config-log-level').value = currentConfig.logging.level;
+            
+            // Load theme
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.getElementById('config-theme').value = savedTheme;
 
             await updateAvailableModels(m.name);
         } catch (err) {

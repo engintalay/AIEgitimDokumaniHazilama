@@ -1,14 +1,5 @@
+/* Theme variables are defined in themes.css */
 :root {
-    --primary-color: #6366f1;
-    --primary-hover: #4f46e5;
-    --bg-dark: #0f172a;
-    --bg-card: #1e293b;
-    --text-main: #f8fafc;
-    --text-muted: #94a3b8;
-    --border-color: #334155;
-    --bot-msg-bg: #334155;
-    --user-msg-bg: #4f46e5;
-    --danger-color: #ef4444;
     --header-height: 70px;
 }
 
@@ -253,8 +244,8 @@ h1 {
 .spinner {
     width: 20px;
     height: 20px;
-    border: 3px solid rgba(255, 255, 255, .3);
-    border-top-color: white;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--primary-color);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
     display: inline-block;
@@ -276,7 +267,7 @@ main {
     width: 320px;
     border-right: 1px solid var(--border-color);
     padding: 2rem;
-    background: rgba(15, 23, 42, 0.8);
+    background: var(--bg-card);
     display: flex;
     flex-direction: column;
     gap: 2rem;

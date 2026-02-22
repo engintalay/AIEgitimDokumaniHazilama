@@ -5,11 +5,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Eğitim Dokümanı Asistanı</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2.13">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2.18">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}?v=1.1">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0ea5e9">
     <link rel="apple-touch-icon" href="/static/img/icon-192.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <script>
+        // Apply theme before page renders to prevent flash
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        if (savedTheme !== 'dark') {
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+    </script>
     <style>
         /* Reference details styles */
         .references-detail-block {
@@ -245,6 +253,23 @@
                         </div>
                     </div>
                     <div class="settings-group">
+                        <label>Tema</label>
+                        <select name="theme" id="config-theme">
+                            <option value="dark">🌙 Dark (Varsayılan)</option>
+                            <option value="light">☀️ Light</option>
+                            <option value="solarized-dark">🌅 Solarized Dark</option>
+                            <option value="solarized-light">🌄 Solarized Light</option>
+                            <option value="high-contrast-dark">♿ Yüksek Kontrast Dark</option>
+                            <option value="high-contrast-light">♿ Yüksek Kontrast Light</option>
+                            <option value="dracula">🧛 Dracula</option>
+                            <option value="nord">❄️ Nord</option>
+                            <option value="monokai">🎨 Monokai</option>
+                            <option value="ocean">🌊 Ocean</option>
+                            <option value="gruvbox-dark">🍂 Gruvbox Dark</option>
+                            <option value="gruvbox-light">🍁 Gruvbox Light</option>
+                        </select>
+                    </div>
+                    <div class="settings-group">
                         <label>Log Seviyesi</label>
                         <select name="log_level" id="config-log-level">
                             <option value="DEBUG">DEBUG (Detaylı)</option>
@@ -291,7 +316,7 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/app.js') }}?v=2.15"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=2.16"></script>
     <script>
         const sidebarToggle = document.getElementById('sidebar-toggle');
         const sidebar = document.querySelector('.sidebar');
