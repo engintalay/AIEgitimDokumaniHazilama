@@ -18,7 +18,7 @@ from core.embedding_client import EmbeddingClient
 from core.vector_db import VectorDB
 from core.ai_client_factory import AIClientFactory
 from utils.logger import setup_logger
-from core.models import db, User, Chat, Message, Report
+from core.models import db, User, Chat, Message, Report, ReportMessage
 from core.auth import oauth, init_auth, handle_google_login, handle_google_callback
 from flask_login import LoginManager, login_required, current_user, logout_user, login_user
 from functools import wraps
@@ -580,9 +580,72 @@ def submit_report():
         logger.error(f"Report error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/my_reports')
+@login_required
+def my_reports():
+    return render_template('reports/my_reports.html')
+
+@app.route('/my_reports_data')
+@login_required
+def my_reports_data():
+    from sqlalchemy.orm import joinedload
+    reports = Report.query.options(joinedload(Report.report_messages)).filter_by(user_id=current_user.id).order_by(Report.updated_at.desc(), Report.timestamp.desc()).all()
+    return jsonify([{
+        "id": r.id,
+        "content": r.content,
+        "image_path": r.image_path,
+        "status": r.status,
+        "timestamp": r.timestamp.isoformat(),
+        "updated_at": r.updated_at.isoformat() if r.updated_at else r.timestamp.isoformat(),
+        "message_id": r.message_id,
+        "reply_count": len(r.report_messages)
+    } for r in reports])
+
+@app.route('/my_reports/<int:report_id>')
+@login_required
+def my_report_detail(report_id):
+    report = Report.query.filter_by(id=report_id, user_id=current_user.id).first_or_404()
+    return render_template('reports/ticket_detail.html', report=report, is_admin=False)
+
+@app.route('/my_reports/<int:report_id>/reply', methods=['POST'])
+@login_required
+def my_report_reply(report_id):
+    report = Report.query.filter_by(id=report_id, user_id=current_user.id).first_or_404()
+    
+    if report.status == 'closed':
+         return jsonify({"error": "Kapanmış bir talebe cevap yazılamaz."}), 400
+         
+    content = request.json.get('content')
+    if not content:
+         return jsonify({"error": "Mesaj boş olamaz."}), 400
+         
+    reply = ReportMessage(
+        report_id=report.id,
+        user_id=current_user.id,
+        content=content
+    )
+    
+    # User replying automatically puts it back to pending/open state for admin
+    if report.status in ['resolved']:
+        report.status = 'pending'
+    
+    db.session.add(reply)
+    db.session.commit()
+    
+    return jsonify({
+        "message": "Cevap başarıyla iletildi.",
+        "reply": {
+            "id": reply.id,
+            "user_name": current_user.name,
+            "content": reply.content,
+            "timestamp": reply.timestamp.isoformat(),
+            "is_admin": False
+        },
+        "status": report.status
+    })
+
 @app.route('/admin/reports/image/<filename>')
 @login_required
-@admin_required
 def get_report_image(filename):
     return send_from_directory(app.config['REPORT_FOLDER'], filename)
 
@@ -596,7 +659,8 @@ def admin_reports():
 @login_required
 @admin_required
 def admin_reports_data():
-    reports = Report.query.order_by(Report.timestamp.desc()).all()
+    from sqlalchemy.orm import joinedload
+    reports = Report.query.options(joinedload(Report.report_messages)).order_by(Report.updated_at.desc(), Report.timestamp.desc()).all()
     return jsonify([{
         "id": r.id,
         "user_name": r.user_rel.name,
@@ -605,8 +669,53 @@ def admin_reports_data():
         "image_path": r.image_path,
         "status": r.status,
         "timestamp": r.timestamp.isoformat(),
-        "message_id": r.message_id
+        "updated_at": r.updated_at.isoformat() if r.updated_at else r.timestamp.isoformat(),
+        "message_id": r.message_id,
+        "reply_count": len(r.report_messages)
     } for r in reports])
+
+@app.route('/admin/reports/<int:report_id>')
+@login_required
+@admin_required
+def admin_report_detail(report_id):
+    report = Report.query.get_or_404(report_id)
+    return render_template('reports/ticket_detail.html', report=report, is_admin=True)
+
+@app.route('/admin/reports/<int:report_id>/reply', methods=['POST'])
+@login_required
+@admin_required
+def admin_report_reply(report_id):
+    report = Report.query.get_or_404(report_id)
+    content = request.json.get('content')
+    
+    if not content:
+         return jsonify({"error": "Mesaj boş olamaz."}), 400
+         
+    # Optional status update from the admin
+    new_status = request.json.get('status')
+    if new_status in ['pending', 'investigating', 'resolved', 'closed']:
+        report.status = new_status
+         
+    reply = ReportMessage(
+        report_id=report.id,
+        user_id=current_user.id,
+        content=content
+    )
+    
+    db.session.add(reply)
+    db.session.commit()
+    
+    return jsonify({
+        "message": "Cevap başarıyla eklendi.",
+        "reply": {
+            "id": reply.id,
+            "user_name": current_user.name,
+            "content": reply.content,
+            "timestamp": reply.timestamp.isoformat(),
+            "is_admin": True
+        },
+        "status": report.status
+    })
 
 @app.route('/admin/vector_explorer')
 @login_required

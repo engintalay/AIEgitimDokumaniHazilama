@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Destek Talebi #{{ report.id }} - AI Asistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2.6">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+
+<body style="background: var(--bg-dark); color: var(--text-main); font-family: 'Inter', sans-serif;">
+    <div class="chat-container">
+        <div style="max-width: 900px; width: 100%; margin: 0 auto;">
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h1 style="color: var(--accent-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                    🎫 Destek Talebi #{{ report.id }}
+                </h1>
+                <a href="{{ '/admin/reports' if is_admin else '/my_reports' }}"
+                    style="padding: 0.5rem 1rem; border-radius: 6px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); text-decoration: none; font-size: 0.9rem;">
+                    &larr; Geri Dön
+                </a>
+            </div>
+
+            <div class="report-card"
+                style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 1rem; padding: 1.5rem; margin-bottom: 2rem;">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">
+                    <div>
+                        <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-main);">İlk Bildirim</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Gönderen: {{
+                            report.user_rel.name }} &bull; {{ report.timestamp.strftime('%d.%m.%Y %H:%M') }}</div>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem;">
+                        {% if is_admin %}
+                        <select id="status-select"
+                            style="background: var(--bg-dark); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                            <option value="pending" {% if report.status=='pending' %}selected{% endif %}>Açık / Bekliyor
+                            </option>
+                            <option value="investigating" {% if report.status=='investigating' %}selected{% endif %}>
+                                İnceleniyor</option>
+                            <option value="resolved" {% if report.status=='resolved' %}selected{% endif %}>Çözüldü
+                            </option>
+                            <option value="closed" {% if report.status=='closed' %}selected{% endif %}>Kapandı</option>
+                        </select>
+                        <button onclick="updateStatus()"
+                            style="background: var(--accent-primary); color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Durumu
+                            Güncelle</button>
+                        {% else %}
+                        {% set bsBg = 'rgba(245, 158, 11, 0.1)' %}
+                        {% set bsCol = '#f59e0b' %}
+                        {% set bsTxt = 'Açık / Bekliyor' %}
+                        {% if report.status == 'investigating' %}{% set bsBg = 'rgba(59, 130, 246, 0.1)' %}{% set bsCol
+                        =
+                        '#3b82f6' %}{% set bsTxt = 'İnceleniyor' %}{% endif %}
+                        {% if report.status == 'resolved' %}{% set bsBg = 'rgba(16, 185, 129, 0.1)' %}{% set bsCol =
+                        '#10b981' %}{% set bsTxt = 'Çözüldü' %}{% endif %}
+                        {% if report.status == 'closed' %}{% set bsBg = 'rgba(107, 114, 128, 0.1)' %}{% set bsCol =
+                        '#6b7280' %}{% set bsTxt = 'Kapandı' %}{% endif %}
+                        <span
+                            style="padding: 6px 16px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; background: {{ bsBg }}; color: {{ bsCol }};">
+                            {{ bsTxt }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div style="font-size: 1rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word;">{{
+                    report.content }}</div>
+
+                {% if report.image_path %}
+                <div style="margin-top: 1.5rem;">
+                    <img src="/admin/reports/image/{{ report.image_path }}" alt="Rapor Görseli"
+                        style="max-width: 300px; max-height: 200px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border-color); transition: transform 0.2s;"
+                        onclick="document.getElementById('image-modal').style.display='flex'; document.getElementById('modal-image').src=this.src;"
+                        onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                </div>
+                {% endif %}
+            </div>
+
+            <h3 style="margin-bottom: 1rem; color: var(--text-muted); font-size: 1.1rem;">Yazışmalar</h3>
+            <div id="messages-container" style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;">
+                {% for msg in report.report_messages %}
+                {% set is_author_admin = msg.user.is_admin %}
+                {% set alignment = 'flex-end' %}
+                {% set bgCol = 'var(--accent-primary)' %}
+                {% set txtCol = 'white' %}
+                {% set brD = '1rem 1rem 0 1rem' %}
+
+                {% if (is_admin and not is_author_admin) or (not is_admin and is_author_admin) %}
+                {% set alignment = 'flex-start' %}
+                {% set bgCol = 'var(--bg-card)' %}
+                {% set txtCol = 'var(--text-main)' %}
+                {% set brD = '1rem 1rem 1rem 0' %}
+                {% endif %}
+
+                <div style="display: flex; flex-direction: column; align-items: {{ alignment }}; width: 100%;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">
+                        {{ msg.user.name }} {% if is_author_admin %}<span
+                            style="color:var(--accent-primary); font-size:0.7rem;">(Yetkili)</span>{% endif %} &bull; {{
+                        msg.timestamp.strftime('%d.%m.%Y %H:%M') }}
+                    </div>
+                    <div
+                        style="background: {{ bgCol }}; color: {{ txtCol }}; padding: 0.8rem 1.2rem; border-radius: {{ brD }}; max-width: 80%; line-height: 1.5; border: 1px solid var(--border-color); white-space: pre-wrap; word-break: break-word;">
+                        {{ msg.content }}</div>
+                </div>
+                {% else %}
+                <div
+                    style="text-align: center; color: var(--text-muted); padding: 2rem; background: var(--bg-card); border-radius: 1rem; border: 1px dashed var(--border-color);">
+                    Henüz bu talebe yanıt verilmedi.
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if report.status != 'closed' %}
+            <div
+                style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 1rem; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+                <textarea id="reply-input" rows="4" placeholder="Cevabınızı buraya yazın..."
+                    style="width: 100%; background: var(--bg-dark); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; font-family: inherit; font-size: 0.95rem; resize: vertical; box-sizing: border-box;"></textarea>
+                <button onclick="sendReply()" id="send-btn"
+                    style="align-self: flex-end; background: var(--accent-primary); color: white; border: none; padding: 0.6rem 1.5rem; border-radius: 6px; font-weight: 600; cursor: pointer; transition: opacity 0.2s;">
+                    Yanıt Gönder
+                </button>
+            </div>
+            {% else %}
+            <div
+                style="text-align: center; color: var(--text-muted); padding: 1.5rem; background: var(--bg-card); border-radius: 1rem; border: 1px dashed var(--border-color);">
+                🔒 Bu destek talebi kapatılmıştır. Yeni cevap eklenemez.
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+
+    <!-- Modal for Image Preview -->
+    <div id="image-modal" class="modal"
+        style="display: none; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 1000;">
+        <div class="modal-content"
+            style="max-width: 90vw; max-height: 90vh; background: transparent; border: none; padding: 0; position: relative;">
+            <span class="close-modal" id="close-image-modal"
+                style="position: absolute; top: -40px; right: 0; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer;">&times;</span>
+            <img class="modal-content" id="modal-image"
+                style="margin: auto; display: block; max-width: 100%; max-height: 80vh; object-fit: contain; border-radius: 8px;">
+        </div>
+    </div>
+
+    <script>
+        const reportId = parseInt('{{ report.id }}');
+        const isAdmin = {{ 'true' if is_admin else 'false' }};
+
+        // Close modal logic
+        const modal = document.getElementById('image-modal');
+        document.getElementById('close-image-modal').onclick = () => modal.style.display = "none";
+        window.onclick = (e) => { if (e.target == modal) modal.style.display = "none"; };
+
+        async function sendReply() {
+            const input = document.getElementById('reply-input');
+            const btn = document.getElementById('send-btn');
+            const content = input.value.trim();
+
+            if (!content) return;
+
+            input.disabled = true;
+            btn.disabled = true;
+            btn.textContent = 'Gönderiliyor...';
+
+            const endpoint = isAdmin ? '/admin/reports/' + reportId + '/reply' : '/my_reports/' + reportId + '/reply';
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content })
+                });
+
+                if (res.ok) {
+                    // Quick and dirty reload to show new message - ideal approach appends DOM node
+                    window.location.reload();
+                } else {
+                    const data = await res.json();
+                    alert(data.error || 'Mesaj gönderilemedi.');
+                }
+            } catch (e) {
+                alert('Bağlantı hatası oluştu.');
+            } finally {
+                input.disabled = false;
+                btn.disabled = false;
+                btn.textContent = 'Yanıt Gönder';
+            }
+        }
+
+        async function updateStatus() {
+            if (!isAdmin) return;
+
+            const select = document.getElementById('status-select');
+            const status = select.value;
+
+            fetch('/admin/reports/' + reportId + '/reply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: "Sistem: Talep durumu güncellendi.", status: status })
+            }).then(res => {
+                if (res.ok) window.location.reload();
+            });
+        }
+    </script>
+</body>
+
+</html>

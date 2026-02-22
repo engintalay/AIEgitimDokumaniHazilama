@@ -110,7 +110,27 @@
         </div>
     </div>
 
+    <!-- Modal for Image Preview -->
+    <div id="image-modal" class="modal"
+        style="display: none; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 1000;">
+        <div class="modal-content"
+            style="max-width: 90vw; max-height: 90vh; background: transparent; border: none; padding: 0; position: relative;">
+            <span class="close-modal" id="close-image-modal"
+                style="position: absolute; top: -40px; right: 0; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer;">&times;</span>
+            <img class="modal-content" id="modal-image"
+                style="margin: auto; display: block; max-width: 100%; max-height: 80vh; object-fit: contain; border-radius: 8px;">
+        </div>
+    </div>
+
     <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const modal = document.getElementById('image-modal');
+            document.getElementById('close-image-modal').onclick = () => modal.style.display = "none";
+            window.onclick = (e) => { if (e.target == modal) modal.style.display = "none"; };
+
+            loadReports();
+        });
+
         async function loadReports() {
             const response = await fetch('/admin/reports_data');
             const reports = await response.json();
@@ -124,42 +144,66 @@
 
             reports.forEach(r => {
                 const date = new Date(r.timestamp).toLocaleString('tr-TR');
+
+                let bsBg = 'rgba(245, 158, 11, 0.1)';
+                let bsCol = '#f59e0b';
+                let bsTxt = 'Açık / Bekliyor';
+
+                if (r.status === 'investigating') {
+                    bsBg = 'rgba(59, 130, 246, 0.1)';
+                    bsCol = '#3b82f6';
+                    bsTxt = 'İnceleniyor';
+                } else if (r.status === 'resolved') {
+                    bsBg = 'rgba(16, 185, 129, 0.1)';
+                    bsCol = '#10b981';
+                    bsTxt = 'Çözüldü';
+                } else if (r.status === 'closed') {
+                    bsBg = 'rgba(107, 114, 128, 0.1)';
+                    bsCol = '#6b7280';
+                    bsTxt = 'Kapandı';
+                } else if (r.status === 'ignored') {
+                    bsBg = 'rgba(239, 68, 68, 0.1)';
+                    bsCol = '#ef4444';
+                    bsTxt = 'Gözardı Edildi';
+                }
+
+                const msgContext = r.message_id ? `<div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Görüşme ID: #${r.message_id}</div>` : '';
+
                 const card = document.createElement('div');
                 card.className = 'report-card';
                 card.innerHTML = `
                     <div class="report-header">
                         <div>
                             <span class="report-user">${r.user_name}</span> 
-                            <span style="font-size: 0.8rem; color: var(--text-muted);">(${r.user_email})</span>
+                            <span style="font-size: 0.8rem; color: var(--text-muted);">(${r.user_email}) &bull; Destek Talebi #${r.id}</span>
                         </div>
-                        <span class="status-badge status-${r.status}">${r.status === 'resolved' ? 'Çözüldü' : 'Bekliyor'}</span>
+                        <span style="padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; background: ${bsBg}; color: ${bsCol};">
+                            ${bsTxt}
+                        </span>
                     </div>
                     <div class="report-date">${date}</div>
-                    <div class="report-content">${r.content}</div>
+                    ${msgContext}
+                    <div class="report-content" style="white-space: pre-wrap; word-break: break-word;">${r.content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
                     ${r.image_path ? `
                         <div style="margin-top: 1rem;">
-                            <a href="/admin/reports/image/${r.image_path}" target="_blank">
-                                <img src="/admin/reports/image/${r.image_path}" style="max-width: 100%; border-radius: 0.5rem; cursor: pointer; border: 1px solid var(--border-color);">
-                            </a>
+                            <img src="/admin/reports/image/${r.image_path}" 
+                                 style="max-width: 150px; border-radius: 0.5rem; cursor: pointer; border: 1px solid var(--border-color);"
+                                 onclick="document.getElementById('image-modal').style.display='flex'; document.getElementById('modal-image').src=this.src;">
                         </div>
                     ` : ''}
-                    ${r.status === 'pending' ? `<button onclick="resolveReport(${r.id})" class="btn-resolve">Çözüldü İşaretle</button>` : ''}
+                    
+                    <div style="margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                        <span style="font-size: 0.85rem; color: ${r.reply_count > 0 ? 'var(--accent-primary)' : 'var(--text-muted)'}; cursor: default;">
+                            💬 ${r.reply_count} Yanıt
+                        </span>
+                        <a href="/admin/reports/${r.id}" style="background: var(--accent-primary); color: white; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-size: 0.85rem; font-weight: 500; transition: background 0.2s;">
+                            Detayları Gör & Yanıtla
+                        </a>
+                    </div>
                 `;
                 container.appendChild(card);
             });
         }
-
-        async function resolveReport(id) {
-            try {
-                const response = await fetch(`/admin/reports/${id}/resolve`, { method: 'POST' });
-                const data = await response.json();
-                loadReports();
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
-        loadReports();
     </script>
 </body>
 

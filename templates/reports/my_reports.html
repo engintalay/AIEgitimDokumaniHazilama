@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hata Raporlarım - AI Asistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2.6">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+
+<body style="background: var(--bg-dark); color: var(--text-main); font-family: 'Inter', sans-serif;">
+    <div class="chat-container">
+        <div class="welcome-screen">
+            <h1
+                style="color: var(--accent-primary); margin-bottom: 2rem; display: flex; align-items: center; gap: 0.5rem;">
+                🎫 Hata Raporlarım
+            </h1>
+
+            <div class="reports-list" id="my-reports-list"
+                style="max-width: 800px; width: 100%; text-align: left; display: flex; flex-direction: column; gap: 1rem;">
+                <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    <span class="spinner" style="display: inline-block;"></span>
+                    <p style="margin-top: 1rem;">Raporlarınız yükleniyor...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Image Preview -->
+    <div id="image-modal" class="modal"
+        style="display: none; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 1000;">
+        <div class="modal-content"
+            style="max-width: 90vw; max-height: 90vh; background: transparent; border: none; padding: 0; position: relative;">
+            <span class="close-modal" id="close-image-modal"
+                style="position: absolute; top: -40px; right: 0; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer;">&times;</span>
+            <img class="modal-content" id="modal-image"
+                style="margin: auto; display: block; max-width: 100%; max-height: 80vh; object-fit: contain; border-radius: 8px;">
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const reportsList = document.getElementById('my-reports-list');
+            const modal = document.getElementById('image-modal');
+            const modalImg = document.getElementById('modal-image');
+            const closeBtn = document.getElementById('close-image-modal');
+
+            // Close modal logic
+            closeBtn.onclick = () => modal.style.display = "none";
+            window.onclick = (e) => {
+                if (e.target == modal) modal.style.display = "none";
+            };
+
+            try {
+                const response = await fetch('/my_reports_data');
+                const reports = await response.json();
+
+                if (reports.length === 0) {
+                    reportsList.innerHTML = `
+                    <div style="text-align: center; color: var(--text-muted); padding: 3rem; background: var(--bg-card); border-radius: 1rem; border: 1px dashed var(--border-color);">
+                        <p style="font-size: 3rem; margin-bottom: 1rem;">🤔</p>
+                        <p>Henüz gönderdiğiniz bir hata raporu bulunmuyor.</p>
+                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">Sorun bildirmek için sohbet alanındaki 🚩 butonunu kullanabilirsiniz.</p>
+                    </div>`;
+                    return;
+                }
+
+                reportsList.innerHTML = reports.map(r => {
+                    const date = new Date(r.timestamp).toLocaleString('tr-TR');
+
+                    let bsBg = 'rgba(245, 158, 11, 0.1)';
+                    let bsCol = '#f59e0b';
+                    let bsTxt = 'Açık / Bekliyor';
+
+                    if (r.status === 'investigating') {
+                        bsBg = 'rgba(59, 130, 246, 0.1)';
+                        bsCol = '#3b82f6';
+                        bsTxt = 'İnceleniyor';
+                    } else if (r.status === 'resolved') {
+                        bsBg = 'rgba(16, 185, 129, 0.1)';
+                        bsCol = '#10b981';
+                        bsTxt = 'Çözüldü';
+                    } else if (r.status === 'closed') {
+                        bsBg = 'rgba(107, 114, 128, 0.1)';
+                        bsCol = '#6b7280';
+                        bsTxt = 'Kapandı';
+                    } else if (r.status === 'ignored') {
+                        bsBg = 'rgba(239, 68, 68, 0.1)';
+                        bsCol = '#ef4444';
+                        bsTxt = 'Gözardı Edildi';
+                    }
+
+                    const msgContext = r.message_id ? `<div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Görüşme ID: #${r.message_id} üzerinden bildirildi</div>` : '';
+
+                    let imgHtml = '';
+                    if (r.image_path) {
+                        imgHtml = `
+                    <div style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                        <img src="/admin/reports/image/${r.image_path}" 
+                             alt="Rapor Görseli" 
+                             style="max-height: 120px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border-color); transition: transform 0.2s;"
+                             onclick="document.getElementById('image-modal').style.display='flex'; document.getElementById('modal-image').src=this.src;"
+                             onmouseover="this.style.transform='scale(1.02)'"
+                             onmouseout="this.style.transform='scale(1)'">
+                    </div>`;
+                    }
+
+                    return `
+                <div class="report-card" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 1rem; padding: 1.5rem; transition: transform 0.2s, box-shadow 0.2s;"
+                     onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
+                     onmouseout="this.style.transform='none'; this.style.boxShadow='none'">
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                        <div>
+                            <span style="font-size: 0.85rem; color: var(--text-muted); font-family: monospace;">Destek Talebi #${r.id}</span>
+                            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">${date}</div>
+                        </div>
+                        <span style="padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; background: ${bsBg}; color: ${bsCol};">
+                            ${bsTxt}
+                        </span>
+                    </div>
+                    
+                    ${msgContext}
+                    
+                    <div style="font-size: 0.95rem; line-height: 1.5; background: rgba(0, 0, 0, 0.2); padding: 1rem; border-radius: 0.5rem; word-break: break-word; white-space: pre-wrap;">${r.content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+                    
+                    ${imgHtml}
+                    
+                    <div style="margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                        <span style="font-size: 0.85rem; color: ${r.reply_count > 0 ? 'var(--accent-primary)' : 'var(--text-muted)'}; cursor: default;">
+                            💬 ${r.reply_count} Yanıt
+                        </span>
+                        <a href="/my_reports/${r.id}" style="background: var(--accent-primary); color: white; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-size: 0.85rem; font-weight: 500; transition: background 0.2s;">
+                            Detayları Gör & Yanıtla
+                        </a>
+                    </div>
+                </div>`;
+                }).join('');
+
+            } catch (err) {
+                console.error('Raporlar yüklenemedi:', err);
+                reportsList.innerHTML = '<div style="color: #ef4444; padding: 1rem;">Raporlar yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.</div>';
+            }
+        });
+    </script>
+</body>
+
+</html>

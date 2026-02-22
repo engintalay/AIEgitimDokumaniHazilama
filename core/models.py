@@ -48,6 +48,17 @@ class Report(db.Model):
     image_path = db.Column(db.String(255), nullable=True)
     status = db.Column(db.String(20), default="pending") # pending, resolved, ignored
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user_rel = db.relationship('User', backref='reports')
     message_rel = db.relationship('Message', backref='reports')
+    report_messages = db.relationship('ReportMessage', backref='report', lazy=True, cascade="all, delete-orphan", order_by="ReportMessage.timestamp")
+
+class ReportMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    report_id = db.Column(db.Integer, db.ForeignKey('report.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    user = db.relationship('User')
