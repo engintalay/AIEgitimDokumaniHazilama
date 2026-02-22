@@ -481,9 +481,24 @@ def handle_config():
 @app.route('/available_models', methods=['GET'])
 def get_available_models():
     try:
-        models = ai_client.get_available_models()
+        # Check if client asked for a specific provider/endpoint (used by Admin settings modal)
+        provider = request.args.get('type')
+        endpoint = request.args.get('endpoint')
+        
+        if provider:
+            temp_cfg = {
+                "type": provider,
+                "endpoint": endpoint or ""
+            }
+            temp_client = AIClientFactory.create(temp_cfg)
+            models = temp_client.get_available_models()
+        else:
+            # Fall back to global client
+            models = ai_client.get_available_models()
+            
         return jsonify({"models": models})
     except Exception as e:
+        logger.error(f"Model listesi çekilemedi: {str(e)}")
         return jsonify({"models": []})
 
 # --- Admin Routes ---

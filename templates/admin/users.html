@@ -213,10 +213,17 @@
         async function fetchAvailableModels() {
             try {
                 const select = document.getElementById('config-model-name');
+                const providerType = document.getElementById('config-model-type').value;
+                const endpoint = document.getElementById('config-endpoint').value;
+                
                 const prevVal = select.value;
                 select.innerHTML = '<option value="">Yükleniyor...</option>';
 
-                const response = await fetch('/available_models');
+                const url = new URL('/available_models', window.location.origin);
+                if (providerType) url.searchParams.append('type', providerType);
+                if (endpoint) url.searchParams.append('endpoint', endpoint);
+
+                const response = await fetch(url);
                 const data = await response.json();
 
                 select.innerHTML = '';
