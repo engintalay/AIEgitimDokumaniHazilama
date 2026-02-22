@@ -113,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             chatWindow.innerHTML = '';
             data.messages.forEach(msg => {
-                addMessage(msg.role, msg.content, false, msg.sources, msg.id, msg.stats);
+                addMessage(msg.role, msg.content, false, msg.sources, msg.id, msg.stats, msg.reference_details);
             });
 
             fetchHistory(); // Refresh to update active state
@@ -438,7 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.error) {
                 addMessage('bot', `❌ Hata: ${data.error}`);
             } else {
-                addMessage('bot', data.answer, false, data.sources, data.message_id, data.stats);
+                addMessage('bot', data.answer, false, data.sources, data.message_id, data.stats, data.reference_details);
                 if (!currentChatId && data.chat_id) {
                     currentChatId = data.chat_id;
                     fetchHistory();
@@ -597,7 +597,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    function addMessage(role, text, isLoading = false, sources = [], messageId = null, stats = null) {
+    function addMessage(role, text, isLoading = false, sources = [], messageId = null, stats = null, referenceDetails = []) {
         const div = document.createElement('div');
         div.className = `message ${role}-message`;
 
@@ -639,6 +639,22 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        let referenceHtml = '';
+        if (role === 'bot' && !isLoading && referenceDetails && referenceDetails.length > 0) {
+            const refs = referenceDetails.map((ref, idx) => `
+                <div class="ref-item">
+                    <div class="ref-header"><strong>Referans #${idx + 1}</strong> (${ref.source})</div>
+                    <div class="ref-content">${ref.content.replace(/\n/g, '<br>')}</div>
+                </div>
+            `).join('');
+            referenceHtml = `
+                <details class="references-detail-block">
+                    <summary>📚 Referans Detaylarını Göster</summary>
+                    <div class="references-container">${refs}</div>
+                </details>
+            `;
+        }
+
         // Replace remaining newlines with <br> for regular text
         processedText = processedText.replace(/\n/g, '<br>');
 
@@ -646,6 +662,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let html = `
             <div class="message-content">${processedText}</div>
+            ${referenceHtml}
             ${statsHtml}
             ${actionHtml}
         `;

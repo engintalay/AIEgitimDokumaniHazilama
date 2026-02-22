@@ -22,16 +22,25 @@ class VectorDB:
             ids=ids
         )
 
-    def query(self, query_embedding: List[float], n_results: int = 3, user_id: Optional[int] = None, source: Optional[Union[str, List[str]]] = None, query_text: Optional[str] = None) -> Dict[str, Any]:
+    def query(self, query_embedding: List[float], n_results: int = 3, user_id: Optional[int] = None, source: Optional[Union[str, List[str]]] = None, query_text: Optional[str] = None, is_admin: bool = False) -> Dict[str, Any]:
         """Search for most similar documents with ownership and optional source filtering."""
         filters = []
         
-        # Ownership/Public Filter
-        if user_id is not None:
-            filters.append({"$or": [
-                {"user_id": user_id},
-                {"is_public": True}
-            ]})
+        # Ownership/Public Filter - Skip if admin
+        if not is_admin and user_id is not None:
+            try:
+                # Ensure user_id is an integer for ChromaDB compatibility
+                uid = int(user_id)
+                filters.append({"$or": [
+                    {"user_id": uid},
+                    {"is_public": True}
+                ]})
+            except (ValueError, TypeError):
+                # If it's truly a string ID or None, pass as is
+                filters.append({"$or": [
+                    {"user_id": user_id},
+                    {"is_public": True}
+                ]})
         
         # Source Filter
         if source:
@@ -95,18 +104,25 @@ class VectorDB:
                     existing_ids = set(results['ids'][0])
                     for i, doc_id in enumerate(keyword_results['ids']):
                         if doc_id not in existing_ids:
+                            # If semantic results are few or keyword match is very relevant, 
+                            # we append. But we must respect the physical limit.
                             results['ids'][0].append(doc_id)
                             results['documents'][0].append(keyword_results['documents'][i])
                             results['metadatas'][0].append(keyword_results['metadatas'][i])
                             if 'distances' in results and results['distances']:
-                                results['distances'][0].append(0.0) # Assume high similarity for exact match
+                                results['distances'][0].append(0.5) # Neutral-high similarity for keyword match
+                
+            # CRITICAL: Strictly enforce the n_results limit to avoid context-length-driven timeouts (524)
+            for key in ['ids', 'documents', 'metadatas', 'distances']:
+                if key in results and results[key] and results[key][0]:
+                    results[key][0] = results[key][0][:n_results]
                             
             return results
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
-            logger.error(f"VectorDB query error (likely empty $or match): {str(e)}")
-            return {"documents": [[]], "metadatas": [[]], "distances": [[]]}
+            logger.error(f"VectorDB query error (where={where}): {str(e)}")
+            return {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
 
     def get_collection_count(self) -> int:
         """Return total document count in collection."""

@@ -25,8 +25,7 @@ model:
   name: llava-1.6-mistral-7b
   retry_attempts: 2
   retry_delay: 3
-  system_prompt: Sen bir Türkçe eğitim dataset uzmanısın. Verilen bağlam bilgilerine
-    göre soruları yanıtla.
+  system_prompt: Sen bir Türkçe eğitim dataset uzmanısın. Verilen bağlam bilgilerine göre soruları yanıtla.
   temperature: 0.3
   timeout: 300
   type: lmstudio

@@ -5,8 +5,64 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Eğitim Dokümanı Asistanı</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2.11">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2.13">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        /* Reference details styles */
+        .references-detail-block {
+            margin-top: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            overflow: hidden;
+            font-size: 0.85rem;
+        }
+
+        .references-detail-block summary {
+            padding: 0.6rem 1rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--accent-primary);
+            user-select: none;
+            background: rgba(var(--accent-primary-rgb), 0.05);
+            transition: background 0.2s;
+        }
+
+        .references-detail-block summary:hover {
+            background: rgba(var(--accent-primary-rgb), 0.1);
+        }
+
+        .references-container {
+            padding: 0.5rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .ref-item {
+            margin-bottom: 0.75rem;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 6px;
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        .ref-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .ref-header {
+            font-size: 0.8rem;
+            margin-bottom: 0.4rem;
+            color: var(--text-muted);
+            opacity: 0.8;
+        }
+
+        .ref-content {
+            line-height: 1.5;
+            color: var(--text-main);
+            word-break: break-word;
+        }
+    </style>
 </head>
 
 <body>

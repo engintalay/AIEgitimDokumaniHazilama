@@ -255,14 +255,48 @@ def ask_question():
             query_emb = embedding_client.get_embedding(query)
             
             rag_cfg = config.get('rag', {})
-            results = vector_db.query(query_emb, n_results=rag_cfg.get('top_k', 3), user_id=current_user.id, source=sources, query_text=query)
+            results = vector_db.query(
+                query_emb, 
+                n_results=rag_cfg.get('top_k', 3), 
+                user_id=current_user.id, 
+                source=sources, 
+                query_text=query,
+                is_admin=current_user.is_admin
+            )
             
             contexts = results.get('documents', [[]])[0]
             metadatas = results.get('metadatas', [[]])[0]
-            context_text = "\n\n".join([f"[Kaynak: {m['source']}]\n{c}" for c, m in zip(contexts, metadatas)])
+            
+            if contexts:
+                ref_count = len(contexts)
+                logger.info(f"✅ {ref_count} referans bulundu.")
+                context_text = "\n\n".join([f"[Kaynak: {m['source']}]\n{c}" for c, m in zip(contexts, metadatas)])
+                ref_prefix = f"({ref_count} referans bulundu)\n\n"
+                # Prepare detailed references for the frontend
+                reference_details = [{"source": m['source'], "content": c} for c, m in zip(contexts, metadatas)]
+            else:
+                logger.info("⚠️ Seçili kaynaklarda ilgili bilgi bulunamadı. Yapay zeka atlanıyor.")
+                # Directly create a message and return if no info found in SELECTED docs
+                bot_msg = Message(
+                    chat_id=active_chat.id, 
+                    role='bot', 
+                    content="(0 referans bulundu)\n\nSeçtiğiniz dokümanlarda bu konuyla ilgili bir bilgiye ulaşılamadı. Lütfen farklı bir doküman seçin veya genel modda (doküman seçmeden) tekrar sorun."
+                )
+                db.session.add(bot_msg)
+                db.session.commit()
+                
+                return jsonify({
+                    "answer": bot_msg.content,
+                    "sources": [],
+                    "reference_details": [],
+                    "chat_id": active_chat.id,
+                    "message_id": bot_msg.id,
+                    "stats": {"time": 0.1, "prompt_tokens": 0, "completion_tokens": 0}
+                })
         else:
             logger.info("📂 Kaynak seçilmedi, genel modda sorgulanıyor.")
             context_text = "DİKKAT: Kullanıcı herhangi bir doküman seçmedi. Bu cevabı genel bilginle ver."
+            ref_prefix = ""
         
         # 2.5 Retrieve Chat History (last 5 messages)
         history_msgs = Message.query.filter_by(chat_id=active_chat.id).order_by(Message.timestamp.desc()).offset(1).limit(5).all()
@@ -292,7 +326,7 @@ def ask_question():
             
         generation_time = time.time() - start_time
         
-        answer = result_data['text']
+        answer = ref_prefix + result_data['text']
         usage = result_data.get('usage', {})
         
         # Save bot message
@@ -312,6 +346,7 @@ def ask_question():
         return jsonify({
             "answer": answer,
             "sources": sources_list,
+            "reference_details": reference_details if 'reference_details' in locals() else [],
             "chat_id": active_chat.id,
             "chat_title": active_chat.title,
             "message_id": bot_msg.id,
