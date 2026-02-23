@@ -788,6 +788,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="message-actions">
                     <button class="action-btn report-btn" title="Hata Bildir">🚩</button>
                     <button class="action-btn copy-btn" title="Metni Kopyala">📋</button>
+                    <button class="action-btn processing-info-btn" title="İşleme Bilgisi">⚙️</button>
                 </div>
             `;
         }
@@ -827,6 +828,10 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             const reportBtn = div.querySelector('.report-btn');
             if (reportBtn) reportBtn.onclick = () => openReportModal(messageId);
+            const processingInfoBtn = div.querySelector('.processing-info-btn');
+            if (processingInfoBtn && messageId) {
+                processingInfoBtn.onclick = () => showProcessingInfo(messageId);
+            }
         }
     }
 
@@ -842,6 +847,82 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.closeReportModal = () => {
         reportModal.classList.remove('active');
+    };
+
+    // Processing Info Modal
+    window.showProcessingInfo = async (messageId) => {
+        try {
+            const response = await fetch(`/api/message/${messageId}/processing-info`);
+            if (!response.ok) {
+                alert('İşleme bilgisi alınamadı.');
+                return;
+            }
+            const info = await response.json();
+            
+            // Create and show modal dynamically
+            let modal = document.getElementById('processing-info-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'processing-info-modal';
+                modal.className = 'modal';
+                document.body.appendChild(modal);
+            }
+            
+            const systemPrompt = info.system_prompt || 'Varsayılan sistem istemi';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>⚙️ İşleme Bilgisi</h2>
+                        <button class="close-btn" onclick="document.getElementById('processing-info-modal').classList.remove('active')">&times;</button>
+                    </div>
+                    <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                            <div class="info-item">
+                                <span class="info-label">📊 Model:</span>
+                                <span class="info-value">${info.model}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">🌡️ Sıcaklık:</span>
+                                <span class="info-value">${info.temperature || 'N/A'}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">📥 Prompt Token:</span>
+                                <span class="info-value">${info.prompt_tokens}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">📤 Cevap Token:</span>
+                                <span class="info-value">${info.completion_tokens}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">📊 Toplam Token:</span>
+                                <span class="info-value">${info.total_tokens}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">⏱️ Süre:</span>
+                                <span class="info-value">${info.response_time_seconds}s</span>
+                            </div>
+                            ${info.tokens_per_second ? `
+                            <div class="info-item">
+                                <span class="info-label">⚡ Hız:</span>
+                                <span class="info-value">${info.tokens_per_second} token/s</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                        
+                        <details class="processing-detail-block">
+                            <summary>🎯 Sistem İstemi</summary>
+                            <div class="processing-detail-content">
+                                <p style="word-break: break-word; white-space: pre-wrap; color: var(--text-main);">${systemPrompt}</p>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            `;
+            modal.classList.add('active');
+        } catch (err) {
+            console.error('Processing info fetch error:', err);
+            alert('İşleme bilgisi alınamadı: ' + err.message);
+        }
     };
 
     reportImage.onchange = () => {
@@ -997,6 +1078,16 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Ayarlar kaydedilemedi.');
         }
     };
+
+    // Heartbeat: Update user activity status every 60 seconds
+    setInterval(async () => {
+        try {
+            await fetch('/api/heartbeat', { method: 'POST' });
+        } catch (err) {
+            console.warn('Heartbeat failed:', err);
+        }
+    }, 60000); // 60 seconds
+
 });
 
 // --- API Error / Cache Handling Logic ---

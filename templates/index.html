@@ -75,6 +75,58 @@
             color: var(--text-main);
             word-break: break-word;
         }
+
+        /* Processing Info Modal Styles */
+        .processing-detail-block {
+            margin-top: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            overflow: hidden;
+            font-size: 0.85rem;
+        }
+
+        .processing-detail-block summary {
+            padding: 0.6rem 1rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--primary-color, #6366f1);
+            user-select: none;
+            background: rgba(99, 102, 241, 0.05);
+            transition: background 0.2s;
+        }
+
+        .processing-detail-block summary:hover {
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .processing-detail-content {
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            padding: 0.75rem;
+            background: rgba(99, 102, 241, 0.05);
+            border-radius: 6px;
+            border-left: 3px solid var(--primary-color, #6366f1);
+        }
+
+        .info-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            opacity: 0.9;
+        }
+
+        .info-value {
+            color: var(--text-main);
+            font-weight: 600;
+            font-size: 1rem;
+        }
     </style>
 </head>
 

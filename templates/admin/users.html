@@ -64,6 +64,30 @@
             font-weight: 600;
         }
 
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+
+        .status-online {
+            background: rgba(34, 197, 94, 0.1);
+            color: #22c55e;
+        }
+
+        .status-idle {
+            background: rgba(251, 146, 60, 0.1);
+            color: #fb923c;
+        }
+
+        .status-offline {
+            background: rgba(107, 114, 128, 0.1);
+            color: #6b7280;
+        }
+
         .view-btn {
             margin-top: 1rem;
             display: inline-block;
@@ -159,35 +183,90 @@
     </div>
 
     <script>
-        async function loadUsers() {
-            const response = await fetch('/admin/users_data');
-            const users = await response.json();
-            const container = document.getElementById('user-list');
-            container.innerHTML = '';
+        let allUsers = [];
 
-            users.forEach(user => {
-                const card = document.createElement('div');
-                card.className = 'user-card';
-                card.innerHTML = `
-                    <img src="${user.picture}" alt="${user.name}" class="user-avatar">
-                    <div class="user-info">
-                        <h3>${user.name} ${user.is_admin ? '<span class="admin-badge">Admin</span>' : ''}</h3>
-                        <p>${user.email}</p>
-                        <p>Total Sohbet: <strong>${user.chat_count}</strong></p>
-                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                            <a href="/admin/user/${user.id}/chats" class="view-btn">Sohbetler</a>
-                            <a href="/admin/user/${user.id}/sources" class="view-btn" style="background: #10b981;">Dosyalar</a>
-                            <button onclick="toggleAdmin(${user.id})" class="view-btn" style="background: #6366f1;">
-                                ${user.is_admin ? 'Yetki Al' : 'Admin Yap'}
-                            </button>
-                            <button onclick="openSettings(${user.id}, '${user.name}')" class="view-btn" style="background: #f59e0b; color: white;">
-                                ⚙️ Ayarlar
-                            </button>
+        function getStatusInfo(lastActivity) {
+            if (!lastActivity) {
+                return { status: 'offline', label: '🔴 Çevrimdışı', className: 'status-offline' };
+            }
+
+            const lastTime = new Date(lastActivity);
+            const now = new Date();
+            const diffMs = now - lastTime;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffSecs = Math.floor(diffMs / 1000);
+
+            if (diffSecs < 30) {
+                return { status: 'online', label: '🟢 Çevrimiçi', className: 'status-online' };
+            } else if (diffMins < 5) {
+                return { status: 'idle', label: `⏱️ Boşta (${diffMins} dk)`, className: 'status-idle' };
+            } else {
+                const hours = Math.floor(diffMins / 60);
+                if (hours > 0) {
+                    return { status: 'offline', label: `🔴 ${hours}h önce çıktı`, className: 'status-offline' };
+                }
+                return { status: 'offline', label: `🔴 ${diffMins}m önce çıktı`, className: 'status-offline' };
+            }
+        }
+
+        async function loadUsers() {
+            try {
+                const response = await fetch('/admin/users_data');
+                allUsers = await response.json();
+                
+                // Get online users list
+                const onlineResponse = await fetch('/admin/users_online');
+                const onlineUsers = await onlineResponse.json();
+                const onlineMap = new Map(onlineUsers.map(u => [u.id, u]));
+
+                const container = document.getElementById('user-list');
+                container.innerHTML = '';
+
+                // Sort by status (online first, then idle, then offline)
+                const statusOrder = { online: 0, idle: 1, offline: 2 };
+                allUsers.sort((a, b) => {
+                    const aStatus = onlineMap.has(a.id) ? 'online' : 'offline';
+                    const bStatus = onlineMap.has(b.id) ? 'online' : 'offline';
+                    return statusOrder[aStatus] - statusOrder[bStatus];
+                });
+
+                allUsers.forEach(user => {
+                    const onlineData = onlineMap.get(user.id);
+                    const statusInfo = getStatusInfo(onlineData?.last_activity);
+                    
+                    const card = document.createElement('div');
+                    card.className = 'user-card';
+                    card.innerHTML = `
+                        <img src="${user.picture}" alt="${user.name}" class="user-avatar">
+                        <div class="user-info">
+                            <h3>${user.name} ${user.is_admin ? '<span class="admin-badge">Admin</span>' : ''}</h3>
+                            <p>${user.email}</p>
+                            <p>Total Sohbet: <strong>${user.chat_count}</strong></p>
+                            <span class="status-badge ${statusInfo.className}">${statusInfo.label}</span>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                                <a href="/admin/user/${user.id}/chats" class="view-btn">Sohbetler</a>
+                                <a href="/admin/user/${user.id}/sources" class="view-btn" style="background: #10b981;">Dosyalar</a>
+                                <button class="view-btn" style="background: #ef4444;" onclick="openChatWithUser(${user.id}, '${user.name.replace(/'/g, "\\'")}')">💬 Mesaj Gönder</button>
+                                <button onclick="toggleAdmin(${user.id})" class="view-btn" style="background: #6366f1;">
+                                    ${user.is_admin ? 'Yetki Al' : 'Admin Yap'}
+                                </button>
+                                <button onclick="openSettings(${user.id}, '${user.name.replace(/'/g, "\\'")}' )" class="view-btn" style="background: #f59e0b; color: white;">
+                                    ⚙️ Ayarlar
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (err) {
+                console.error('loadUsers error:', err);
+                document.getElementById('user-list').innerHTML = '<p>Kullanıcılar yüklenemedi.</p>';
+            }
+        }
+
+        function openChatWithUser(userId, userName) {
+            // Navigate to reports with user_id parameter
+            window.location.href = `/admin/reports?user_id=${userId}`;
         }
 
         async function toggleAdmin(userId) {
@@ -307,7 +386,9 @@
             }
         }
 
+        // Initialize: load users and set up auto-refresh
         loadUsers();
+        setInterval(loadUsers, 30000); // Refresh every 30 seconds
     </script>
 </body>
 

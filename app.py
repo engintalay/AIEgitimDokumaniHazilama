@@ -376,7 +376,9 @@ def ask_question():
                             content=final_answer,
                             response_time=generation_time,
                             prompt_tokens=current_usage.get('prompt_tokens', 0),
-                            completion_tokens=current_usage.get('completion_tokens', 0)
+                            completion_tokens=current_usage.get('completion_tokens', 0),
+                            model_name=config.get('model', {}).get('name'),
+                            temperature=config.get('model', {}).get('temperature')
                         )
                         sources_list = list(set(m['source'] for m in metadatas)) if contexts else []
                         bot_msg.set_sources(sources_list)
@@ -960,6 +962,64 @@ def admin_toggle_role(user_id):
     user.is_admin = not user.is_admin
     db.session.commit()
     return jsonify({"message": f"Kullanıcı artık {'Admin' if user.is_admin else 'Standart'} yetkisine sahip."})
+
+@app.route('/api/heartbeat', methods=['POST'])
+@login_required
+def heartbeat():
+    """Update user's last_activity timestamp. Called periodically by frontend."""
+    current_user.last_activity = datetime.utcnow()
+    db.session.commit()
+    return jsonify({"status": "ok", "timestamp": datetime.utcnow().isoformat()})
+
+@app.route('/admin/users_online')
+@login_required
+@admin_required
+def admin_users_online():
+    """Return list of online users (active within last 5 minutes)."""
+    from datetime import timedelta
+    cutoff_time = datetime.utcnow() - timedelta(minutes=5)
+    
+    online_users = User.query.filter(
+        User.last_activity >= cutoff_time
+    ).order_by(User.last_activity.desc()).all()
+    
+    return jsonify([{
+        "id": u.id,
+        "email": u.email,
+        "name": u.name,
+        "picture": u.picture,
+        "is_admin": u.is_admin,
+        "last_activity": u.last_activity.isoformat() if u.last_activity else None
+    } for u in online_users])
+
+@app.route('/api/message/<int:message_id>/processing-info')
+@login_required
+def message_processing_info(message_id):
+    """Return processing information for a message (model, tokens, response time, etc)."""
+    message = Message.query.get_or_404(message_id)
+    
+    # Verify user has access to this message
+    if message.chat.user_id != current_user.id and not current_user.is_admin:
+        return jsonify({"error": "Bu mesaja erişim izniniz yok."}), 403
+    
+    # Calculate tokens per second
+    tokens_per_second = None
+    if message.response_time and message.response_time > 0:
+        total_tokens = (message.prompt_tokens or 0) + (message.completion_tokens or 0)
+        if total_tokens > 0:
+            tokens_per_second = round(total_tokens / message.response_time, 2)
+    
+    return jsonify({
+        "model": message.model_name or "Unknown",
+        "provider": "lmstudio",  # Hardcoded for now, can be dynamic if needed
+        "temperature": message.temperature or config.get('model', {}).get('temperature'),
+        "system_prompt": config.get('model', {}).get('system_prompt'),
+        "prompt_tokens": message.prompt_tokens or 0,
+        "completion_tokens": message.completion_tokens or 0,
+        "total_tokens": (message.prompt_tokens or 0) + (message.completion_tokens or 0),
+        "response_time_seconds": round(message.response_time, 2) if message.response_time else 0,
+        "tokens_per_second": tokens_per_second
+    })
 
 if __name__ == '__main__':
     # Use environment variables for production behavior

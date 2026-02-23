@@ -13,6 +13,7 @@ class User(db.Model, UserMixin):
     picture = db.Column(db.String(255))
     is_admin = db.Column(db.Boolean, default=False)
     settings = db.Column(db.Text) # Stored as JSON string
+    last_activity = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     chats = db.relationship('Chat', backref='user', lazy=True, cascade="all, delete-orphan")
 
 class Chat(db.Model):
@@ -33,6 +34,8 @@ class Message(db.Model):
     prompt_tokens = db.Column(db.Integer)
     completion_tokens = db.Column(db.Integer)
     reference_details = db.Column(db.Text) # JSON string of list of dicts
+    model_name = db.Column(db.String(255)) # e.g., "llava-1.6-mistral-7b"
+    temperature = db.Column(db.Float) # e.g., 0.3
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_sources(self, sources_list):
