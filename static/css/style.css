@@ -118,7 +118,7 @@ main {
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: radial-gradient(circle at top right, #1e1b4b, transparent);
+    background: var(--chat-bg);
     overflow: hidden;
     /* Chat window and input handle their own scroll */
 }
@@ -174,13 +174,13 @@ main {
 .input-area {
     padding: 1.5rem 2rem 2rem;
     flex-shrink: 0;
-    background: linear-gradient(to top, var(--bg-dark), transparent);
+    background: var(--input-area-bg);
 }
 
 .input-container {
     max-width: 900px;
     margin: 0 auto;
-    background: #1e293b;
+    background: var(--input-bg);
     border: 1px solid var(--border-color);
     border-radius: 1.25rem;
     padding: 0.5rem 1rem;
