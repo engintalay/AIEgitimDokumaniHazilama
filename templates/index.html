@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Eğitim Dokümanı Asistanı</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2.18">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2.21">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}?v=1.1">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0ea5e9">
@@ -381,7 +381,8 @@
 
             // Mobil menüde bir sohbet seçildiğinde veya dışarı tıklandığında menüyü kapat
             document.addEventListener('click', (e) => {
-                if (window.innerWidth <= 768 &&
+                // Breakpoint'i CSS ile uyumlu hale getir (1024px)
+                if (window.innerWidth <= 1024 &&
                     !sidebar.contains(e.target) &&
                     !sidebarToggle.contains(e.target) &&
                     sidebar.classList.contains('active')) {
