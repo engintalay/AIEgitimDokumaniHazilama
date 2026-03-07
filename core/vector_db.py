@@ -92,14 +92,34 @@ class VectorDB:
 
             # 2. Keyword Fallback (if query_text provided and contains specific patterns or results are weak)
             if query_text and len(query_text) > 3:
+                # If the query is a long sentence, $contains will fail as the whole sentence isn't in the doc.
+                # Extract the most meaningful part or split by quotes/strong words.
+                # For simplicity, if it's over 30 chars, we look for quoted text or just take the first N words
+                search_term = query_text.strip()
+                if len(search_term) > 30:
+                    import re
+                    # Try to find quotes first '...' or "..."
+                    quoted = re.findall(r'["\'](.*?)["\']', search_term)
+                    if quoted and len(quoted[0]) > 3:
+                        search_term = quoted[0]
+                    else:
+                        # Find potential keyword phrases (e.g. "Madde 79", capitalized words, or just fallback to first words)
+                        # We use regex to find combinations of Word + Number ("Madde 79") or capitalized sequences
+                        important_phrases = re.findall(r'([A-ZÇÖŞİĞÜa-zçöşığü]+\s+\d+)', search_term)
+                        if important_phrases:
+                            search_term = important_phrases[0]
+                        else:
+                            words = search_term.split()
+                            search_term = " ".join(words[:4]) if len(words) > 4 else search_term
+
                 # To handle basic case variations since $contains is case sensitive in ChromaDB
-                q_lower = query_text.lower()
-                q_title = query_text.title()
-                q_upper = query_text.upper()
-                q_cap = query_text.capitalize()
+                q_lower = search_term.lower()
+                q_title = search_term.title()
+                q_upper = search_term.upper()
+                q_cap = search_term.capitalize()
                 
                 # Use a set to avoid duplicate clauses
-                variations = list(set([query_text, q_lower, q_title, q_upper, q_cap]))
+                variations = list(set([search_term, q_lower, q_title, q_upper, q_cap]))
                 
                 if len(variations) == 1:
                     where_doc = {"$contains": variations[0]}

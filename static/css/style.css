@@ -596,3 +596,90 @@ textarea#user-input {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* ---- Reusable Vector / Reference Card Variables ---- */
+.vector-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--accent-primary, #6366f1);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    position: relative;
+    text-align: left;
+}
+
+.vector-item:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+}
+
+.vector-metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.8rem;
+}
+
+.meta-tag {
+    background: rgba(255, 255, 255, 0.05); /* Works for dark mode mostly, we might need a generic var if it bugs out light mode */
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(128, 128, 128, 0.2);
+}
+
+.meta-tag.accent {
+    background: rgba(var(--accent-rgb), 0.1);
+    color: var(--accent-primary);
+    border-color: rgba(var(--accent-rgb), 0.2);
+}
+
+.content-preview {
+    line-height: 1.5;
+    color: var(--text-main);
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    line-clamp: 4;
+}
+
+.vector-item.expanded .content-preview {
+    display: block;
+    -webkit-line-clamp: initial;
+    line-clamp: initial;
+}
+
+.score-badge {
+    float: right;
+    font-family: monospace;
+    font-weight: 600;
+    background: rgba(var(--accent-rgb), 0.1);
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.4rem;
+    color: var(--accent-primary, #6366f1);
+}
+
+.expand-btn {
+    background: transparent;
+    border: none;
+    color: var(--accent-primary, #6366f1);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 0.5rem 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    transition: color 0.2s;
+    margin-top: 0.5rem;
+}
+
+.expand-btn:hover {
+    color: var(--primary-hover, #4f46e5);
+    text-decoration: underline;
+}

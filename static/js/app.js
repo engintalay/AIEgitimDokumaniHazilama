@@ -732,15 +732,19 @@ document.addEventListener('DOMContentLoaded', () => {
         let referenceHtml = '';
         if (referenceDetails && referenceDetails.length > 0) {
             const refs = referenceDetails.map((ref, idx) => `
-                <div class="ref-item">
-                    <div class="ref-header"><strong>Referans #${idx + 1}</strong> (${ref.source})</div>
-                    <div class="ref-content">${ref.content.replace(/\n/g, '<br>')}</div>
+                <div class="vector-item" style="margin-top: 0.5rem;">
+                    <div class="content-preview">${ref.content.replace(/\n/g, '<br>')}</div>
+                    <button class="expand-btn" onclick="this.parentElement.classList.toggle('expanded'); this.innerHTML = this.parentElement.classList.contains('expanded') ? 'Daralt ▲' : 'Genişlet ▼';">Genişlet ▼</button>
+                    <div class="vector-metadata" style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
+                        <span class="meta-tag accent">📄 ${ref.source}</span>
+                        <span class="meta-tag">🆔 Referans #${idx + 1}</span>
+                    </div>
                 </div>
             `).join('');
             referenceHtml = `
                 <details class="references-detail-block">
                     <summary>📚 Referans Detaylarını Göster</summary>
-                    <div class="references-container">${refs}</div>
+                    <div class="references-container" style="padding-top: 0.5rem;">${refs}</div>
                 </details>
             `;
         }
