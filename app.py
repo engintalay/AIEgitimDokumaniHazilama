@@ -101,11 +101,15 @@ def get_components():
     rag_cfg = config.get('rag', {})
     model_cfg = config.get('model', {})
     
+    # Use the same provider/endpoint string as the text generation model for embeddings
+    embedding_provider = model_cfg.get('type', 'lmstudio')
+    embedding_endpoint = model_cfg.get('endpoint', 'http://127.0.0.1:1234')
+    
     embedding_client = EmbeddingClient(
-        provider=rag_cfg.get('embedding_provider', 'ollama'),
-        endpoint=rag_cfg.get('embedding_endpoint', 'http://127.0.0.1:11434'),
-        model=rag_cfg.get('embedding_model', 'nomic-embed-text'),
-        api_key=rag_cfg.get('embedding_api_key', '')
+        provider=embedding_provider,
+        endpoint=embedding_endpoint,
+        model=rag_cfg.get('embedding_model', 'nomic-embed-text-v1.5'),
+        api_key=model_cfg.get('api_key', '')
     )
     
     vector_db = VectorDB(
@@ -222,6 +226,7 @@ def upload_file():
             })
             
         except Exception as e:
+            logger.exception("❌ Dosya yükleme/işleme sırasında kritik hata oluştu:")
             return jsonify({"error": f"İşlem hatası: {str(e)}"}), 500
 
 @app.route('/ask', methods=['POST'])

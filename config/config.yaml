@@ -22,7 +22,7 @@ model:
   json_mode: false
   json_wrapper: questions
   max_tokens: 4096
-  name: llava-1.6-mistral-7b
+  name: auto
   retry_attempts: 2
   retry_delay: 3
   system_prompt: Sen bir Türkçe eğitim dataset uzmanısın. Verilen bağlam bilgilerine göre soruları yanıtla.
@@ -42,7 +42,7 @@ progress:
 rag:
   collection_name: training_docs
   db_path: ./data/vector_db
-  embedding_provider: ollama
-  embedding_endpoint: http://127.0.0.1:11434
-  embedding_model: nomic-embed-text
+  embedding_provider: lmstudio
+  embedding_endpoint: http://127.0.0.1:1234
+  embedding_model: auto
   top_k: 2

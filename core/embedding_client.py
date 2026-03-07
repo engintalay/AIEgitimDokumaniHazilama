@@ -26,8 +26,28 @@ class EmbeddingClient:
     def _get_lmstudio_embedding(self, text: str) -> List[float]:
         """Call LM Studio embedding API (OpenAI compatible)."""
         url = f"{self.endpoint}/v1/embeddings"
+        
+        # Auto-detect embedding model if set to 'auto' or empty
+        model_name = self.model
+        if model_name in ["", "auto", "local-model"]:
+            try:
+                resp = requests.get(f"{self.endpoint}/v1/models", timeout=5)
+                if resp.status_code == 200:
+                    models = resp.json().get('data', [])
+                    if models:
+                        # Find an embedding model
+                        embed_models = [m['id'] for m in models if 'embed' in m['id'].lower()]
+                        if embed_models:
+                            model_name = embed_models[0]
+                        else:
+                            model_name = models[0]['id']
+                else:
+                    model_name = "local-model"
+            except Exception:
+                model_name = "local-model"
+
         payload = {
-            "model": self.model,
+            "model": model_name,
             "input": text
         }
         try:

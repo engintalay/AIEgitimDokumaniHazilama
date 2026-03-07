@@ -513,7 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     try {
                         const data = JSON.parse(jsonStr);
                         lastDataTime = Date.now(); // Reset timeout counter
-                        
+
                         if (data.type === 'metadata') {
                             // Use the loading placeholder as the bot message container
                             if (!botMsgDiv) {
@@ -533,11 +533,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                 // Reuse the loadingMsg element as the bot message container
                                 botMsgDiv = loadingMsg;
                             }
-                            
+
                             // Remove stop button on first content (if not already removed)
                             const stopBtn = botMsgDiv.querySelector('.stop-btn');
                             if (stopBtn) stopBtn.remove();
-                            
+
                             // Add the new content
                             fullText += data.text;
                             botMsgDiv.innerHTML = formatContent(fullText, metadata ? metadata.reference_details : []);
@@ -565,7 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             }
-            
+
             clearInterval(checkTimeout); // Clean up timeout checker
         } catch (err) {
             removeMessage(loadingMsg);
@@ -858,7 +858,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             const info = await response.json();
-            
+
             // Create and show modal dynamically
             let modal = document.getElementById('processing-info-modal');
             if (!modal) {
@@ -867,7 +867,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 modal.className = 'modal';
                 document.body.appendChild(modal);
             }
-            
+
             const systemPrompt = info.system_prompt || 'Varsayılan sistem istemi';
             modal.innerHTML = `
                 <div class="modal-content">
@@ -1007,7 +1007,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('config-temp').value = m.temperature;
             document.getElementById('config-max-tokens').value = m.max_tokens;
             document.getElementById('config-log-level').value = currentConfig.logging.level;
-            
+
             // Load theme
             const savedTheme = localStorage.getItem('theme') || 'dark';
             document.getElementById('config-theme').value = savedTheme;
@@ -1090,15 +1090,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 });
 
-// --- API Error / Cache Handling Logic ---
 window.openVectorModal = function (sourceName) {
     const modal = document.getElementById('vector-modal');
     const iframe = document.getElementById('vector-iframe');
+    const currentTheme = localStorage.getItem('theme') || 'dark';
     if (modal && iframe) {
-        iframe.src = `/vector_explorer?source=${encodeURIComponent(sourceName)}&embed=true`;
+        iframe.src = `/vector_explorer?source=${encodeURIComponent(sourceName)}&embed=true&theme=${currentTheme}`;
         modal.classList.add('active');
     }
-};
+}
 
 window.closeVectorModal = function () {
     const modal = document.getElementById('vector-modal');
@@ -1107,4 +1107,4 @@ window.closeVectorModal = function () {
         iframe.src = '';
         modal.classList.remove('active');
     }
-};
+}

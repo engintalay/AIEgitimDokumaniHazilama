@@ -99,6 +99,7 @@ class TextProcessor:
 
         for i in range(1, len(initial_units)):
             next_unit = initial_units[i]
+            peek_next = initial_units[i+1] if i + 1 < len(initial_units) else ""
             should_merge = False
             
             # Helper for list detection
@@ -120,22 +121,38 @@ class TextProcessor:
             # Rule 4: Title Detection (Current is a short title leading into next)
             current_is_title = len(current) < 100 and (current.isupper() or not re.search(r'[.!?]$', current.strip()))
 
-            if is_header or current_ends_colon or current_is_title:
-                if not (next_unit.startswith('|') or next_unit.startswith('[GÖRSEL:')):
+            # Rule 5: Legal Article (Madde) Grouping
+            has_madde = bool(re.search(r'(^|\n)(Madde|Geçici Madde|Ek Madde)\s+\d+', current, re.I))
+            next_starts_new_section = bool(re.match(r'^((Madde|Geçici Madde|Ek Madde)\s+\d+|[A-ZÇÖÜİŞĞ\s]+\s+(KISIM|BÖLÜM))', next_unit.strip(), re.I))
+            next_is_header_for_following = len(next_unit) < 150 and not re.search(r'[.!?]$', next_unit.strip()) and \
+                                           bool(re.match(r'^(Madde|Geçici Madde|Ek Madde)\s+\d+', peek_next.strip(), re.I))
+
+            # Explicit rejection rule: If we are about to transition to a new article/section, DO NOT MERGE.
+            # UNLESS the current block is clearly a header/title for that new section.
+            if (next_starts_new_section or next_is_header_for_following) and not (is_header or current_ends_colon or current_is_title):
+                should_merge = False
+            else:
+                if has_madde:
                     should_merge = True
-            elif is_citation or next_starts_connector:
-                should_merge = True
-            elif current_is_list and next_is_list:
-                should_merge = True
-            elif is_header and len(next_unit) < 150 and not (next_unit.startswith('|') or next_unit.startswith('[GÖRSEL:')):
-                 should_merge = True
-            elif (current.startswith('|') or '|--' in current) and next_unit.startswith('|'):
-                should_merge = True
-            elif (re.match(r'^(Not|Önemli|Dikkat)$', current.strip(), re.I) or re.match(r'^\(\d+\)$', current.strip())) and next_unit.startswith('|'):
-                should_merge = True
+                elif is_header or current_ends_colon or current_is_title:
+                    if not (next_unit.startswith('|') or next_unit.startswith('[GÖRSEL:')):
+                        should_merge = True
+                elif is_citation or next_starts_connector:
+                    should_merge = True
+                elif current_is_list and next_is_list:
+                    should_merge = True
+                elif (current.startswith('|') or '|--' in current) and next_unit.startswith('|'):
+                    should_merge = True
+                elif (re.match(r'^(Not|Önemli|Dikkat)$', current.strip(), re.I) or re.match(r'^\(\d+\)$', current.strip())) and next_unit.startswith('|'):
+                    should_merge = True
 
             if should_merge:
-                current += "\n\n" + next_unit
+                # Add size constraint to prevent ChromaDB segfaults (max ~4000 chars)
+                if len(current) + len(next_unit) > 4000:
+                    merged.append(current)
+                    current = next_unit
+                else:
+                    current += "\n\n" + next_unit
             else:
                 merged.append(current)
                 current = next_unit

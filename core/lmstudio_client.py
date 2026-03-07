@@ -10,6 +10,21 @@ logger = logging.getLogger(__name__)
 class LMStudioClient(AIClient):
     """LM Studio AI client (OpenAI-compatible API)."""
     
+    def _auto_detect_model(self, requested_model: str) -> str:
+        if requested_model and requested_model not in ["", "auto", "local-model"]:
+            return requested_model
+        try:
+            available = self.get_available_models()
+            if available:
+                # Filter out embedding models for chat text generation
+                chat_models = [m for m in available if 'embed' not in m.lower()]
+                if chat_models:
+                    return chat_models[0]
+                return available[0]
+        except Exception as e:
+            logger.warning(f"Could not auto-detect model: {e}")
+        return "local-model"
+
     def generate(self, prompt: str, options: Dict[str, Any] = None) -> Dict[str, Any]:
         """Generate response from LM Studio with optional parameter overrides."""
         options = options or {}
@@ -18,7 +33,7 @@ class LMStudioClient(AIClient):
         endpoint = options.get('endpoint', self.endpoint) or self.endpoint
         url = f"{endpoint}/v1/chat/completions"
         
-        model = options.get('name', self.model_name) or self.model_name
+        model = self._auto_detect_model(options.get('name', self.model_name) or self.model_name)
         
         try:
             temp_val = options.get('temperature', self.temperature)
@@ -106,7 +121,7 @@ class LMStudioClient(AIClient):
         options = options or {}
         endpoint = options.get('endpoint', self.endpoint) or self.endpoint
         url = f"{endpoint}/v1/chat/completions"
-        model = options.get('name', self.model_name) or self.model_name
+        model = self._auto_detect_model(options.get('name', self.model_name) or self.model_name)
         
         try:
             temp = float(options.get('temperature', self.temperature))

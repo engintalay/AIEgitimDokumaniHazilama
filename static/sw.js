@@ -42,6 +42,11 @@ self.addEventListener('fetch', (event) => {
             caches.match(event.request).then((response) => response || fetch(event.request))
         );
     } else {
-        event.respondWith(fetch(event.request));
+        event.respondWith(
+            fetch(event.request).catch((err) => {
+                console.warn('Fetch failed (might be an ad/analytics blocker):', err);
+                return new Response(null, { status: 502, statusText: 'Bad Gateway' });
+            })
+        );
     }
 });

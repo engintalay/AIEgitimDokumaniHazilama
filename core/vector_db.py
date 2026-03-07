@@ -91,11 +91,24 @@ class VectorDB:
                     results['distances'][0] = filtered_distances
 
             # 2. Keyword Fallback (if query_text provided and contains specific patterns or results are weak)
-            # Or just always do it for robustness if query_text is short enough or specific
             if query_text and len(query_text) > 3:
+                # To handle basic case variations since $contains is case sensitive in ChromaDB
+                q_lower = query_text.lower()
+                q_title = query_text.title()
+                q_upper = query_text.upper()
+                q_cap = query_text.capitalize()
+                
+                # Use a set to avoid duplicate clauses
+                variations = list(set([query_text, q_lower, q_title, q_upper, q_cap]))
+                
+                if len(variations) == 1:
+                    where_doc = {"$contains": variations[0]}
+                else:
+                    where_doc = {"$or": [{"$contains": v} for v in variations]}
+
                 keyword_results = self.collection.get(
                     where=where,
-                    where_document={"$contains": query_text},
+                    where_document=where_doc,
                     limit=n_results
                 )
                 
@@ -104,13 +117,12 @@ class VectorDB:
                     existing_ids = set(results['ids'][0])
                     for i, doc_id in enumerate(keyword_results['ids']):
                         if doc_id not in existing_ids:
-                            # If semantic results are few or keyword match is very relevant, 
-                            # we append. But we must respect the physical limit.
-                            results['ids'][0].append(doc_id)
-                            results['documents'][0].append(keyword_results['documents'][i])
-                            results['metadatas'][0].append(keyword_results['metadatas'][i])
+                            # Prepend exact matches to the top 
+                            results['ids'][0].insert(0, doc_id)
+                            results['documents'][0].insert(0, keyword_results['documents'][i])
+                            results['metadatas'][0].insert(0, keyword_results['metadatas'][i])
                             if 'distances' in results and results['distances']:
-                                results['distances'][0].append(0.5) # Neutral-high similarity for keyword match
+                                results['distances'][0].insert(0, 0.01) # Near perfect similarity for exact string match
                 
             # CRITICAL: Strictly enforce the n_results limit to avoid context-length-driven timeouts (524)
             for key in ['ids', 'documents', 'metadatas', 'distances']:
